@@ -282,23 +282,19 @@ function renderCharts() {
 
 function renderFocusShopsChart() {
     const ctx = document.getElementById('chart-focus-shops').getContext('2d');
-    
+
     let focusShops = filteredData.filter(d => d.vol_tb_ngay >= 10 && d.pct_opr < 0.9);
-    
     if (focusShops.length < 5) {
         focusShops = filteredData.filter(d => d.vol_tb_ngay >= 5 && d.pct_opr < 0.9);
     }
-    
     focusShops.sort((a, b) => b.vol_tb_ngay - a.vol_tb_ngay);
     focusShops = focusShops.slice(0, 20);
 
-    const labels = focusShops.map(s => {
-        let name = s.ten_kh || s.warehouse_name || 'Unknown';
-        return name.length > 20 ? name.substring(0, 20) + '...' : name;
-    });
-    
-    const volData = focusShops.map(s => s.vol_tb_ngay);
-    const oprData = focusShops.map(s => s.pct_opr * 100);
+    // Hiển thị full tên shop (không cắt)
+    const labels = focusShops.map(s => s.ten_kh || s.warehouse_name || 'Unknown');
+
+    const volData   = focusShops.map(s => s.vol_tb_ngay);
+    const oprData   = focusShops.map(s => s.pct_opr * 100);
     const rotLcData = focusShops.map(s => (s.pct_rot_lc || 0) * 100);
 
     if (charts.focusShops) charts.focusShops.destroy();
@@ -312,7 +308,7 @@ function renderFocusShopsChart() {
                     type: 'line',
                     label: 'OPR (%)',
                     data: oprData,
-                    borderColor: 'rgba(168, 85, 247, 1)', // Purple
+                    borderColor: 'rgba(168, 85, 247, 1)',
                     backgroundColor: 'rgba(168, 85, 247, 1)',
                     borderWidth: 2,
                     yAxisID: 'y1',
@@ -331,7 +327,7 @@ function renderFocusShopsChart() {
                     type: 'line',
                     label: '% Rớt LC (%)',
                     data: rotLcData,
-                    borderColor: 'rgba(239, 68, 68, 1)', // Red
+                    borderColor: 'rgba(239, 68, 68, 1)',
                     backgroundColor: 'rgba(239, 68, 68, 1)',
                     borderWidth: 2,
                     yAxisID: 'y1',
@@ -393,10 +389,8 @@ function renderFocusShopsChart() {
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.datasetIndex === 0 || context.datasetIndex === 1) { // Line datasets
+                            if (label) label += ': ';
+                            if (context.datasetIndex === 0 || context.datasetIndex === 1) {
                                 label += context.raw.toFixed(1) + '%';
                             } else {
                                 label += Math.round(context.raw).toLocaleString();
@@ -407,22 +401,24 @@ function renderFocusShopsChart() {
                             const shopIdx = context[0].dataIndex;
                             const shop = focusShops[shopIdx];
                             const shopName = shop.ten_kh;
-                            const hubName = shop.warehouse_name;
-                            
-                            // Lục lại rawData để lấy 3 tháng (nhưng chỉ đúng Bưu cục này)
+                            const hubName  = shop.warehouse_name;
+
                             const history = rawData
                                 .filter(r => r.ten_kh === shopName && r.warehouse_name === hubName)
                                 .sort((a, b) => (a.thang || '').localeCompare(b.thang || ''));
-                                
+
+                            // Bỏ prefix "Bưu Cục:", chỉ ghi thẳng tên
                             let lines = [
-                                `Khối lượng TB hiện tại: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
-                                `% Rớt LC hiện tại: ${((shop.pct_rot_lc || 0) * 100).toFixed(1)}%`,
-                                `Bưu Cục: ${shop.warehouse_name || 'Không rõ'}`,
-                                `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`
+                                `${hubName || 'Không rõ'}`,
+                                `KL TB: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
+                                `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
+                                '─── Lịch Sử % Rớt LC ───'
                             ];
-                            lines.push('--- Lịch Sử 3 Tháng ---');
                             history.forEach(h => {
-                                lines.push(`Tháng ${h.thang || '?'}: Vol ${Math.round(h.vol_tb_ngay || 0)} | Rớt LC ${((h.pct_rot_lc || 0) * 100).toFixed(1)}% | OPR ${(h.pct_opr * 100).toFixed(1)}%`);
+                                const rotLcPct = ((h.pct_rot_lc || 0) * 100).toFixed(1);
+                                const oprPct   = (h.pct_opr * 100).toFixed(1);
+                                const vol      = Math.round(h.vol_tb_ngay || 0);
+                                lines.push(`T${h.thang || '?'}: ${vol} đơn/ng | Rớt LC ${rotLcPct}% | OPR ${oprPct}%`);
                             });
                             return lines;
                         },
@@ -433,6 +429,7 @@ function renderFocusShopsChart() {
         }
     });
 }
+
 
 function renderTopShopsChart() {
     const ctx = document.getElementById('chart-top-shops').getContext('2d');
@@ -484,7 +481,7 @@ function renderTopShopsChart() {
                                 `OPR: ${oprs[context.dataIndex].toFixed(1)}%`,
                                 `% Rớt LC: ${((shop.pct_rot_lc || 0) * 100).toFixed(1)}%`,
                                 `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
-                                `Bưu Cục: ${shop.warehouse_name || 'Không rõ'}`
+                                `${shop.warehouse_name || 'Không rõ'}`
                             ];
                         }
                     }
@@ -1062,7 +1059,17 @@ function calculateShopGroups() {
     });
 
     recommendations.sort((a, b) => b.combined_vol_tb_ngay - a.combined_vol_tb_ngay);
-    return recommendations;
+
+    // Greedy: each shop appears in AT MOST ONE group
+    const usedShopKeys = new Set();
+    const uniqueRecs = recommendations.filter(rec => {
+        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${s.ten_kh}`);
+        if (keys.some(k => usedShopKeys.has(k))) return false;
+        keys.forEach(k => usedShopKeys.add(k));
+        return true;
+    });
+
+    return uniqueRecs;
 }
 
 // Render recommendations list into the grouping table
