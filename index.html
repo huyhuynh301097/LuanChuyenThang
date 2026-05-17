@@ -94,6 +94,7 @@
             <div class="tabs-container">
                 <button class="tab-btn active" data-tab="tab-dashboard"><i class='bx bx-pie-chart-alt-2'></i> Analytics Dashboard</button>
                 <button class="tab-btn" data-tab="tab-data"><i class='bx bx-table'></i> Raw Data Details</button>
+                <button class="tab-btn" data-tab="tab-grouping"><i class='bx bx-git-merge'></i> Gợi Ý Gom Nhóm</button>
             </div>
 
             <div id="tab-dashboard" class="tab-content active">
@@ -218,6 +219,76 @@
                 </div>
             </section>
             </div> <!-- End tab-data -->
+
+            <div id="tab-grouping" class="tab-content">
+                <!-- Grouping Intro Card -->
+                <div class="grouping-intro-card">
+                    <i class='bx bx-bulb'></i>
+                    <div>
+                        <h4>Giải Pháp Đề Xuất Gom Nhóm Luân Chuyển Thẳng</h4>
+                        <p>
+                            Nhằm hỗ trợ các bưu cục gom hàng tối ưu cho xe tải luân chuyển thẳng (khi các shop đơn lẻ chưa đạt 1.000 đơn/ngày). Hệ thống tự động phân tích dữ liệu thực tế và đề xuất các tổ hợp gồm <strong>2 - 3 shop</strong> nằm trong <strong>cùng một Quận/Huyện</strong> và cùng thuộc <strong>một Bưu cục lấy</strong>. Thứ tự đề xuất được ưu tiên theo tổng sản lượng gom trung bình ngày giảm dần.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Grouping Controls -->
+                <div class="grouping-controls-bar">
+                    
+                    <!-- Min Combined Volume Slider -->
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Sản lượng nhóm tối thiểu/ngày:</label>
+                            <span id="grouping-vol-val" style="color: var(--accent-blue); font-weight: bold; font-family: monospace; font-size: 1rem;">300 đơn</span>
+                        </div>
+                        <input type="range" id="grouping-min-vol" min="100" max="1000" step="50" value="300">
+                    </div>
+
+                    <!-- Group Size Filter -->
+                    <div style="min-width: 180px;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Quy mô nhóm gom:</label>
+                        <select id="grouping-size" style="width: 100%; padding: 0.5rem;">
+                            <option value="all">Tất cả (2 hoặc 3 Shop)</option>
+                            <option value="2">Gom 2 Shop</option>
+                            <option value="3">Gom 3 Shop</option>
+                        </select>
+                    </div>
+
+                    <!-- Search Box for Grouping -->
+                    <div style="min-width: 220px; flex-grow: 0.5;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Tìm Bưu cục / Quận:</label>
+                        <input type="text" id="grouping-search" placeholder="Nhập tên bưu cục hoặc quận..." style="width: 100%; padding: 0.5rem 1rem;">
+                    </div>
+
+                </div>
+
+                <!-- Grouping Table Section -->
+                <section class="data-table-section">
+                    <div class="table-header">
+                        <h3>Danh Sách Đề Xuất Gom Nhóm Tối Ưu (Xếp Hạng Sản Lượng)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="grouping-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70px; text-align: center;">Hạng</th>
+                                    <th>Bưu Cục Lấy</th>
+                                    <th>Quận/Huyện</th>
+                                    <th style="text-align: center; width: 100px;">Quy Mô</th>
+                                    <th>Danh Sách Shop Đề Xuất (Sản Lượng & OPR)</th>
+                                    <th style="text-align: right; width: 180px;">Tổng Vol Gom/Ngày</th>
+                                    <th style="text-align: right; width: 180px;">Tổng Vol Gom/3 Tháng</th>
+                                    <th style="text-align: center; width: 120px;">OPR TB Nhóm</th>
+                                    <th style="text-align: center; width: 160px;">Khả Thi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Grouping data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div> <!-- End tab-grouping -->
         </main>
     </div>
 

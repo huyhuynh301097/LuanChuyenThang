@@ -572,3 +572,95 @@ tbody tr.danger-row:hover {
         padding: 1rem;
     }
 }
+
+/* Shop Grouping Recommender Custom Styles */
+.grouping-intro-card {
+    background: var(--bg-panel);
+    border-left: 4px solid var(--accent-blue);
+    padding: 1.25rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: var(--shadow-soft);
+}
+
+.grouping-intro-card h4 {
+    color: white;
+    margin-bottom: 0.3rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.grouping-intro-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.grouping-intro-card i {
+    color: var(--accent-blue);
+    font-size: 1.8rem;
+    margin-top: 0.2rem;
+}
+
+.grouping-controls-bar {
+    background: var(--bg-panel);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: center;
+    box-shadow: var(--shadow-soft);
+}
+
+/* Custom Slider Styling */
+#grouping-min-vol {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#grouping-min-vol::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#grouping-min-vol::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: #60a5fa;
+}
+
+#grouping-size, #grouping-search {
+    background: var(--bg-dark);
+    color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    outline: none;
+    font-size: 0.9rem;
+    height: 38px;
+    transition: var(--transition);
+}
+
+#grouping-size:focus, #grouping-search:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
+}
+

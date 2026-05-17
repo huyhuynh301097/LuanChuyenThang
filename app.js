@@ -131,6 +131,19 @@ function setupEventListeners() {
         if (shopSearchInput) {
             shopSearchInput.value = '';
         }
+        // Reset grouping interactive selectors
+        const groupVolSlider = document.getElementById('grouping-min-vol');
+        if (groupVolSlider) {
+            groupVolSlider.value = 300;
+            const label = document.getElementById('grouping-vol-val');
+            if (label) label.textContent = '300 đơn';
+        }
+        const groupSizeSelect = document.getElementById('grouping-size');
+        if (groupSizeSelect) groupSizeSelect.value = 'all';
+        
+        const groupSearchInput = document.getElementById('grouping-search');
+        if (groupSearchInput) groupSearchInput.value = '';
+
         applyFilters();
     });
 
@@ -159,6 +172,19 @@ function setupEventListeners() {
     if (detailShopSearch) {
         detailShopSearch.addEventListener('input', updateTable);
     }
+
+    // Grouping Slicers listeners
+    const groupVolSlider = document.getElementById('grouping-min-vol');
+    if (groupVolSlider) {
+        groupVolSlider.addEventListener('input', (e) => {
+            const label = document.getElementById('grouping-vol-val');
+            if (label) label.textContent = `${e.target.value} đơn`;
+            updateGroupingTab();
+        });
+    }
+
+    document.getElementById('grouping-size')?.addEventListener('change', updateGroupingTab);
+    document.getElementById('grouping-search')?.addEventListener('input', updateGroupingTab);
 
     // Tab Navigation
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -197,6 +223,7 @@ function updateDashboard() {
     generateAlerts();
     renderHeatmaps();
     updateTrendShopOptions();
+    updateGroupingTab();
 }
 
 // Formatter Helpers
@@ -835,5 +862,203 @@ function renderHeatmaps() {
 
         html += `</tbody></table></div>`;
         container.innerHTML += html;
+    });
+}
+
+
+// Calculate combinations of 2 and 3 shops for each (quan, warehouse_name) cluster
+function calculateShopGroups() {
+    const clusters = {};
+
+    filteredData.forEach(row => {
+        const quan = row.quan;
+        const whName = row.warehouse_name;
+        const shop = row.ten_kh;
+        
+        if (!quan || !whName || !shop) return;
+
+        const clusterKey = `${quan} ||| ${whName}`;
+        if (!clusters[clusterKey]) {
+            clusters[clusterKey] = {};
+        }
+
+        if (!clusters[clusterKey][shop]) {
+            clusters[clusterKey][shop] = {
+                ten_kh: shop,
+                vol: 0,
+                vol_tb_ngay_sum: 0,
+                vol_tb_ngay_count: 0,
+                opr_vol_sum: 0,
+                kl: 0
+            };
+        }
+
+        const s = clusters[clusterKey][shop];
+        s.vol += row.vol || 0;
+        s.vol_tb_ngay_sum += row.vol_tb_ngay || 0;
+        s.vol_tb_ngay_count++;
+        s.opr_vol_sum += (row.pct_opr || 0) * (row.vol || 0);
+        s.kl += row['kl(kg)'] || 0;
+    });
+
+    const recommendations = [];
+
+    Object.entries(clusters).forEach(([clusterKey, shopsMap]) => {
+        const [quan, whName] = clusterKey.split(' ||| ');
+        
+        const candidateShops = Object.values(shopsMap).map(s => {
+            const avgVolTbNgay = s.vol_tb_ngay_count > 0 ? (s.vol_tb_ngay_sum / s.vol_tb_ngay_count) : 0;
+            const weightedOpr = s.vol > 0 ? (s.opr_vol_sum / s.vol) : 0;
+            return {
+                ten_kh: s.ten_kh,
+                avg_vol_tb_ngay: avgVolTbNgay,
+                weighted_opr: weightedOpr,
+                total_vol: s.vol,
+                total_weight: s.kl
+            };
+        })
+        .filter(s => s.avg_vol_tb_ngay < 1000 && s.total_vol > 0);
+
+        if (candidateShops.length < 2) return;
+
+        // Size 2 combinations
+        for (let i = 0; i < candidateShops.length; i++) {
+            for (let j = i + 1; j < candidateShops.length; j++) {
+                const s1 = candidateShops[i];
+                const s2 = candidateShops[j];
+                
+                const combinedVol = s1.total_vol + s2.total_vol;
+                const combinedOpr = combinedVol > 0 ? ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol)) / combinedVol : 0;
+                
+                recommendations.push({
+                    quan,
+                    warehouse_name: whName,
+                    shops: [s1, s2],
+                    combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay,
+                    combined_vol: combinedVol,
+                    combined_opr: combinedOpr
+                });
+            }
+        }
+
+        // Size 3 combinations
+        if (candidateShops.length >= 3) {
+            for (let i = 0; i < candidateShops.length; i++) {
+                for (let j = i + 1; j < candidateShops.length; j++) {
+                    for (let k = j + 1; k < candidateShops.length; k++) {
+                        const s1 = candidateShops[i];
+                        const s2 = candidateShops[j];
+                        const s3 = candidateShops[k];
+                        
+                        const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
+                        const combinedOpr = combinedVol > 0 ? 
+                            ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol) + (s3.weighted_opr * s3.total_vol)) / combinedVol : 0;
+                        
+                        recommendations.push({
+                            quan,
+                            warehouse_name: whName,
+                            shops: [s1, s2, s3],
+                            combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay + s3.avg_vol_tb_ngay,
+                            combined_vol: combinedVol,
+                            combined_opr: combinedOpr
+                        });
+                    }
+                }
+            }
+        }
+    });
+
+    recommendations.sort((a, b) => b.combined_vol_tb_ngay - a.combined_vol_tb_ngay);
+    return recommendations;
+}
+
+// Render recommendations list into the grouping table
+function updateGroupingTab() {
+    const table = document.querySelector('#grouping-table tbody');
+    if (!table) return;
+    table.innerHTML = '';
+
+    const groups = calculateShopGroups();
+
+    const minVol = parseInt(document.getElementById('grouping-min-vol')?.value || 300, 10);
+    const groupSize = document.getElementById('grouping-size')?.value || 'all';
+    const searchQuery = (document.getElementById('grouping-search')?.value || '').trim().toLowerCase();
+
+    let filteredGroups = groups.filter(g => {
+        if (g.combined_vol_tb_ngay < minVol) return false;
+        if (groupSize === '2' && g.shops.length !== 2) return false;
+        if (groupSize === '3' && g.shops.length !== 3) return false;
+
+        if (searchQuery) {
+            const matchHub = g.warehouse_name.toLowerCase().includes(searchQuery);
+            const matchQuan = g.quan.toLowerCase().includes(searchQuery);
+            if (!matchHub && !matchQuan) return false;
+        }
+        return true;
+    });
+
+    if (filteredGroups.length === 0) {
+        table.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
+        return;
+    }
+
+    filteredGroups.forEach((g, idx) => {
+        const tr = document.createElement('tr');
+
+        let oprBg = '';
+        if (g.combined_opr < 0.85) oprBg = '#ef4444';
+        else if (g.combined_opr < 0.90) oprBg = '#f97316';
+        else if (g.combined_opr < 0.95) oprBg = '#eab308';
+        else oprBg = '#22c55e';
+
+        let statusBadge = '';
+        if (g.combined_vol_tb_ngay >= 1000) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20, 184, 166, 0.2)); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Siêu Tiềm Năng</span>';
+        } else if (g.combined_vol_tb_ngay >= 500) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.2)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Khả Thi Cao</span>';
+        } else if (g.combined_vol_tb_ngay >= 200) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 179, 8, 0.2)); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); font-weight: 600;">Tiềm Năng</span>';
+        } else {
+            statusBadge = '<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);">Cần Nuôi Thêm</span>';
+        }
+
+        let shopListHtml = '<div style="display: flex; flex-direction: column; gap: 0.4rem; padding: 0.2rem 0;">';
+        g.shops.forEach(s => {
+            let shopOprColor = s.weighted_opr < 0.9 ? '#f43f5e' : '#14b8a6';
+            shopListHtml += `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(51, 65, 85, 0.4); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(51, 65, 85, 0.6);">
+                    <span style="font-weight: 600; color: #f8fafc; font-size: 0.85rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${s.ten_kh}</span>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-family: monospace; font-size: 0.75rem;">${formatNumber(s.avg_vol_tb_ngay)} đơn/ngày</span>
+                        <span class="badge" style="background-color: rgba(20, 184, 166, 0.15); color: ${shopOprColor}; font-family: monospace; font-size: 0.75rem;">OPR: ${formatPercent(s.weighted_opr)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        shopListHtml += '</div>';
+
+        const progressPct = Math.min(100, (g.combined_vol_tb_ngay / 1000) * 100);
+        const barColor = g.combined_vol_tb_ngay >= 1000 ? 'var(--accent-teal)' : 'var(--accent-blue)';
+        const volProgressHtml = `
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;">
+                <span style="font-weight: bold; color: var(--accent-blue); font-size: 0.95rem; font-family: monospace;">${formatNumber(g.combined_vol_tb_ngay)} đơn</span>
+                <div style="width: 100px; height: 5px; background: rgba(51, 65, 85, 0.6); border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${progressPct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+                </div>
+            </div>
+        `;
+
+        tr.innerHTML = `
+            <td style="text-align: center;"><span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: ${idx === 0 ? 'rgba(234, 179, 8, 0.2)' : idx === 1 ? 'rgba(148, 163, 184, 0.2)' : 'rgba(115, 115, 115, 0.2)'}; color: ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : '#a3a3a3'}; font-weight: bold; font-size: 0.85rem; border: 1px solid ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : 'transparent'};">${idx + 1}</span></td>
+            <td style="font-weight: 700; color: white;">${g.warehouse_name}</td>
+            <td style="color: var(--text-muted); font-weight: 500;">${g.quan}</td>
+            <td style="text-align: center;"><span class="badge" style="background-color: ${g.shops.length === 3 ? 'rgba(139, 92, 246, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; color: ${g.shops.length === 3 ? '#a78bfa' : '#38bdf8'}; font-weight: bold;">Gom ${g.shops.length} Shop</span></td>
+            <td>${shopListHtml}</td>
+            <td style="text-align: right; vertical-align: middle;">${volProgressHtml}</td>
+            <td style="text-align: right; vertical-align: middle; font-weight: bold; color: var(--text-main); font-family: monospace; font-size: 0.9rem;">${formatNumber(g.combined_vol)} đơn</td>
+            <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${oprBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_opr)}</span></td>
+            <td style="text-align: center; vertical-align: middle;">${statusBadge}</td>
+        `;
+        table.appendChild(tr);
     });
 }
