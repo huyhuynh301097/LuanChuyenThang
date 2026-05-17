@@ -917,7 +917,9 @@ function calculateShopGroups() {
                 total_weight: s.kl
             };
         })
-        .filter(s => s.avg_vol_tb_ngay < 1000 && s.total_vol > 0);
+        .filter(s => s.avg_vol_tb_ngay < 1000 && s.total_vol > 0)
+        .sort((a, b) => b.avg_vol_tb_ngay - a.avg_vol_tb_ngay)
+        .slice(0, 10);
 
         if (candidateShops.length < 2) return;
 
