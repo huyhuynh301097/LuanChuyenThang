@@ -127,11 +127,12 @@
                         <h3 id="score-shops">0</h3>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-icon drop-icon" style="background-color: rgba(249, 115, 22, 0.2); color: #f97316;"><i class='bx bx-calendar-star'></i></div>
+                <div class="card pending">
+                    <div class="card-icon drop-icon" style="background-color: rgba(239, 68, 68, 0.1); color: var(--accent-red);"><i class='bx bx-trending-down'></i></div>
                     <div class="card-info">
-                        <p>Ngày >1000 Đơn</p>
-                        <h3 id="score-days-1000">0</h3>
+                        <p>% Rớt Luân Chuyển</p>
+                        <h3 id="score-transfer-drop">-</h3>
+                        <small style="color: var(--text-muted)">Chưa có dữ liệu</small>
                     </div>
                 </div>
             </section>
@@ -178,8 +179,12 @@
             <div id="tab-data" class="tab-content">
             <!-- Data Table Section -->
             <section class="data-table-section">
-                <div class="table-header">
+                <div class="table-header" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
                     <h3>Bảng Dữ Liệu Chi Tiết (Như File Gốc)</h3>
+                    <div class="search-box" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Tìm Tên Shop:</label>
+                        <input type="text" id="detail-shop-search" placeholder="Nhập tên shop để tìm..." style="padding: 0.5rem 1rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px; width: 250px; outline: none; font-size: 0.9rem; transition: border-color 0.2s;">
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table id="details-table">
@@ -192,6 +197,7 @@
                                 <th>Mã BC Lấy</th>
                                 <th>Bưu Cục Lấy</th>
                                 <th>Tên Khách Hàng (Shop)</th>
+                                <th>Mã Đơn Mẫu</th>
                                 <th>Nhóm Sản Lượng</th>
                                 <th>Tổng Vol</th>
                                 <th>Tổng KL (Kg)</th>

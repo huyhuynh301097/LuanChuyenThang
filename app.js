@@ -127,6 +127,10 @@ function setupEventListeners() {
         selectIds.forEach(({ prop }) => {
             filters[prop].clear();
         });
+        const shopSearchInput = document.getElementById('detail-shop-search');
+        if (shopSearchInput) {
+            shopSearchInput.value = '';
+        }
         applyFilters();
     });
 
@@ -149,6 +153,12 @@ function setupEventListeners() {
 
     // Trend Shop Select
     document.getElementById('trend-shop-select').addEventListener('change', renderShopTrendChart);
+
+    // Detail Shop Search Slicer
+    const detailShopSearch = document.getElementById('detail-shop-search');
+    if (detailShopSearch) {
+        detailShopSearch.addEventListener('input', updateTable);
+    }
 
     // Tab Navigation
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -206,13 +216,16 @@ function updateScorecards() {
     const avgOpr = totalVol > 0 ? (totalOprVol / totalVol) : 0;
     
     const totalShops = filteredData.length;
-    const totalDays1000 = filteredData.reduce((sum, row) => sum + (row.so_ngay_tren_1000_don || 0), 0);
 
     document.getElementById('score-volume').textContent = formatNumber(totalVol);
     document.getElementById('score-weight').textContent = formatNumber(totalWeight);
     document.getElementById('score-opr').textContent = formatPercent(avgOpr);
     document.getElementById('score-shops').textContent = formatNumber(totalShops);
-    document.getElementById('score-days-1000').textContent = formatNumber(totalDays1000);
+    
+    const scoreTransferDrop = document.getElementById('score-transfer-drop');
+    if (scoreTransferDrop) {
+        scoreTransferDrop.textContent = 'N/A';
+    }
 }
 
 // Chart Configurations
@@ -345,11 +358,12 @@ function renderFocusShopsChart() {
                                 
                             let lines = [
                                 `Khối lượng TB hiện tại: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
-                                `Bưu Cục: ${shop.warehouse_name || 'Không rõ'}`
+                                `Bưu Cục: ${shop.warehouse_name || 'Không rõ'}`,
+                                `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`
                             ];
                             lines.push('--- Lịch Sử 3 Tháng ---');
                             history.forEach(h => {
-                                lines.push(`Tháng ${h.thang || '?'}: Vol ${Math.round(h.vol_tb_ngay || 0)} | KL ${Math.round(h['kl_tb_ngay(kg)'] || 0)}Kg | OPR ${(h.pct_opr * 100).toFixed(1)}%`);
+                                lines.push(`Tháng ${h.thang || '?'}: Vol ${Math.round(h.vol_tb_ngay || 0)} | KL ${Math.round(h['kl_tb_ngay(kg)'] || 0)}Kg | OPR ${(h.pct_opr * 100).toFixed(1)}% | Ngày >1000 đơn: ${h.so_ngay_tren_1000_don || 0}`);
                             });
                             return lines;
                         },
@@ -409,6 +423,7 @@ function renderTopShopsChart() {
                             return [
                                 `Khối lượng TB: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
                                 `OPR: ${oprs[context.dataIndex].toFixed(1)}%`,
+                                `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
                                 `Bưu Cục: ${shop.warehouse_name || 'Không rõ'}`
                             ];
                         }
@@ -462,8 +477,8 @@ function renderShopTrendChart() {
 
     const [shopName, hubName] = selectedKey.split('|');
 
-    // Get all records for this shop AND hub across all months
-    const shopData = rawData
+    // Get all records for this shop AND hub across all months (respecting selected filters)
+    const shopData = filteredData
         .filter(r => r.ten_kh === shopName && r.warehouse_name === hubName)
         .sort((a, b) => a.thang.localeCompare(b.thang));
 
@@ -541,13 +556,10 @@ function renderShopTrendChart() {
                         },
                         afterLabel: function(context) {
                             const row = shopData[context.dataIndex];
-                            if (context.datasetIndex === 0) { // Volume Bar
-                                return [
-                                    `Khối lượng TB: ${Math.round(row['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
-                                    `Số ngày >1000 đơn: ${row.so_ngay_tren_1000_don || 0} ngày`
-                                ];
-                            }
-                            return null;
+                            return [
+                                `Khối lượng TB: ${Math.round(row['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
+                                `Số ngày >1000 đơn: ${row.so_ngay_tren_1000_don || 0} ngày`
+                            ];
                         }
                     }
                 }
@@ -602,8 +614,8 @@ function renderShopDistributionChart() {
             plugins: {
                 legend: { 
                     display: true,
-                    position: 'right',
-                    labels: { color: 'rgba(241, 245, 249, 1)', padding: 20 }
+                    position: 'bottom',
+                    labels: { color: 'rgba(241, 245, 249, 1)', padding: 10 }
                 },
                 tooltip: {
                     callbacks: {
@@ -625,8 +637,16 @@ function updateTable() {
     const tbody = document.querySelector('#details-table tbody');
     tbody.innerHTML = '';
 
+    const shopSearchVal = (document.getElementById('detail-shop-search')?.value || '').trim().toLowerCase();
+
+    // Filter by Shop Name if query is present
+    let tableData = [...filteredData];
+    if (shopSearchVal) {
+        tableData = tableData.filter(row => (row.ten_kh || '').toLowerCase().includes(shopSearchVal));
+    }
+
     // Sort by Volume descending by default, take top 500
-    const tableData = [...filteredData]
+    tableData = tableData
         .sort((a, b) => b.vol - a.vol)
         .slice(0, 500);
 
@@ -662,6 +682,7 @@ function updateTable() {
             <td>${row.warehouse_id || '-'}</td>
             <td><strong>${row.warehouse_name || '-'}</strong></td>
             <td style="color: var(--accent-blue); font-weight: bold;">${row.ten_kh || '-'}</td>
+            <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
             <td><span class="badge ${badgeClass}">${row.nhom_san_luong}</span></td>
             <td style="background-color: ${volBg}; font-weight: bold;">${formatNumber(row.vol)}</td>
             <td>${formatNumber(row['kl(kg)'])}</td>
@@ -678,7 +699,7 @@ function updateTable() {
     });
 
     if (tableData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="17" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="19" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
     }
 }
 
@@ -703,8 +724,12 @@ function generateAlerts() {
             vol: data.vol,
             opr: data.vol > 0 ? (data.totalOprVol / data.vol) : 0
         }))
-        .filter(d => d.opr > 0 && d.opr < 0.9 && d.vol >= 500) // Alerts for OPR < 90% and decent volume
-        .sort((a, b) => a.opr - b.opr);
+        .filter(d => d.opr > 0 && d.opr < 0.9 && d.vol >= 100) // Alerts for OPR < 90% and volume >= 100
+        .sort((a, b) => {
+            const riskA = a.vol * (1 - a.opr);
+            const riskB = b.vol * (1 - b.opr);
+            return riskB - riskA; // High risk first
+        });
 
     if (badDistricts.length > 0) {
         // Only show top 3 alerts to avoid clutter
@@ -714,8 +739,8 @@ function generateAlerts() {
             alertCard.innerHTML = `
                 <i class='bx bx-error-circle'></i>
                 <div class="alert-content">
-                    <h4>Cảnh Báo: OPR Rất Thấp Tại ${d.name} (${d.vung})</h4>
-                    <p>Trung bình OPR chỉ đạt <strong>${(d.opr * 100).toFixed(2)}%</strong> với tổng sản lượng lớn (${formatNumber(d.vol)} đơn). Cần ưu tiên xử lý lấy hàng!</p>
+                    <h4>Cảnh Báo Quận/Huyện: OPR Thấp & Vol Cao tại ${d.name} (${d.vung})</h4>
+                    <p>Trung bình OPR chỉ đạt <strong>${(d.opr * 100).toFixed(2)}%</strong> với tổng sản lượng lớn (${formatNumber(d.vol)} đơn). Ảnh hưởng khoảng <strong>${formatNumber(Math.round(d.vol * (1 - d.opr)))}</strong> đơn hàng chậm trễ!</p>
                 </div>
             `;
             alertsContainer.appendChild(alertCard);
@@ -724,8 +749,12 @@ function generateAlerts() {
 
     // Add Shop Alerts
     const badShops = [...filteredData]
-        .filter(d => d.pct_opr > 0 && d.pct_opr < 0.9 && d.vol_tb_ngay >= 50)
-        .sort((a, b) => a.pct_opr - b.pct_opr);
+        .filter(d => d.pct_opr > 0 && d.pct_opr < 0.9 && d.vol_tb_ngay >= 10)
+        .sort((a, b) => {
+            const riskA = a.vol * (1 - a.pct_opr);
+            const riskB = b.vol * (1 - b.pct_opr);
+            return riskB - riskA; // High risk first
+        });
 
     if (badShops.length > 0) {
         // Show up to 3 worst shops
@@ -736,8 +765,8 @@ function generateAlerts() {
             alertCard.innerHTML = `
                 <i class='bx bx-store-alt' style="color: #f43f5e"></i>
                 <div class="alert-content">
-                    <h4 style="color: #f43f5e">Cảnh Báo Shop: ${s.ten_kh}</h4>
-                    <p>OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> với sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày tại BC ${s.warehouse_name}. Số ngày bạo đơn (>1000): ${s.so_ngay_tren_1000_don || 0} ngày.</p>
+                    <h4 style="color: #f43f5e">Cảnh Báo Shop Lớn OPR Thấp: ${s.ten_kh}</h4>
+                    <p>OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> với sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn) tại BC ${s.warehouse_name}. Số ngày bạo đơn (>1000): ${s.so_ngay_tren_1000_don || 0} ngày.</p>
                 </div>
             `;
             alertsContainer.appendChild(alertCard);
