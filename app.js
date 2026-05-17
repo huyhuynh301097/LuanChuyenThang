@@ -217,10 +217,17 @@ function updateScorecards() {
     
     const totalShops = filteredData.length;
 
-    document.getElementById('score-volume').textContent = formatNumber(totalVol);
-    document.getElementById('score-weight').textContent = formatNumber(totalWeight);
-    document.getElementById('score-opr').textContent = formatPercent(avgOpr);
-    document.getElementById('score-shops').textContent = formatNumber(totalShops);
+    const elVol = document.getElementById('score-volume');
+    if (elVol) elVol.textContent = formatNumber(totalVol);
+
+    const elWeight = document.getElementById('score-weight');
+    if (elWeight) elWeight.textContent = formatNumber(totalWeight);
+
+    const elOpr = document.getElementById('score-opr');
+    if (elOpr) elOpr.textContent = formatPercent(avgOpr);
+
+    const elShops = document.getElementById('score-shops');
+    if (elShops) elShops.textContent = formatNumber(totalShops);
     
     const scoreTransferDrop = document.getElementById('score-transfer-drop');
     if (scoreTransferDrop) {
