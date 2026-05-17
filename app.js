@@ -773,7 +773,7 @@ function generateAlerts() {
                 <i class='bx bx-store-alt' style="color: #f43f5e"></i>
                 <div class="alert-content">
                     <h4 style="color: #f43f5e">Cảnh Báo Shop Lớn OPR Thấp: ${s.ten_kh}</h4>
-                    <p>OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> với sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn) tại BC ${s.warehouse_name}. Số ngày bạo đơn (>1000): ${s.so_ngay_tren_1000_don || 0} ngày.</p>
+                    <p>OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> với sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn) tại BC ${s.warehouse_name}. Số ngày có vol > 1000 đơn: ${s.so_ngay_tren_1000_don || 0} ngày.</p>
                 </div>
             `;
             alertsContainer.appendChild(alertCard);
