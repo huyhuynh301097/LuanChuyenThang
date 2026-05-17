@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GHN - Dashboard Phân Tích Lấy Hàng (TTS)</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Boxicons for icons -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js DataLabels Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar for Filters -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class='bx bx-cube'></i>
+                <h2>GHN Analytics</h2>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Bộ Lọc Dữ Liệu</h3>
+                
+                <div class="filter-group">
+                    <label>Tháng</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm tháng..." data-target="filter-month">
+                    <div class="checkbox-list" id="filter-month"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Vùng</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm vùng..." data-target="filter-region">
+                    <div class="checkbox-list" id="filter-region"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Tỉnh/Thành</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm tỉnh..." data-target="filter-province">
+                    <div class="checkbox-list" id="filter-province"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Quận/Huyện</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm quận..." data-target="filter-district">
+                    <div class="checkbox-list" id="filter-district"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Nhóm Sản Lượng</label>
+                    <div class="checkbox-list" id="filter-volume">
+                        <label class="checkbox-item"><input type="checkbox" value="1. Duoi 100 don/ngay"> <span>Dưới 100 đơn/ngày</span></label>
+                        <label class="checkbox-item"><input type="checkbox" value="2. 100 - 300 don/ngay"> <span>100 - 300 đơn/ngày</span></label>
+                        <label class="checkbox-item"><input type="checkbox" value="3. 300 - 500 don/ngay"> <span>300 - 500 đơn/ngày</span></label>
+                        <label class="checkbox-item"><input type="checkbox" value="4. 500 - 1000 don/ngay"> <span>500 - 1000 đơn/ngày</span></label>
+                        <label class="checkbox-item"><input type="checkbox" value="5. Trên 1000 don/ngay"> <span>Trên 1000 đơn/ngày</span></label>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Mô Hình (KHL/BC)</label>
+                    <div class="checkbox-list" id="filter-hub-type"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Bưu Cục Lấy</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm bưu cục..." data-target="filter-hub">
+                    <div class="checkbox-list" id="filter-hub"></div>
+                </div>
+
+                <button id="reset-filters" class="btn-primary">
+                    <i class='bx bx-refresh'></i> Đặt Lại Bộ Lọc
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1>Dashboard Phân Tích Lấy Hàng (Tiktok Shop)</h1>
+                <div class="header-actions">
+                    <span class="last-updated">Dữ liệu: 3 tháng gần nhất</span>
+                </div>
+            </header>
+
+            <!-- Tabs Navigation -->
+            <div class="tabs-container">
+                <button class="tab-btn active" data-tab="tab-dashboard"><i class='bx bx-pie-chart-alt-2'></i> Analytics Dashboard</button>
+                <button class="tab-btn" data-tab="tab-data"><i class='bx bx-table'></i> Raw Data Details</button>
+            </div>
+
+            <div id="tab-dashboard" class="tab-content active">
+                <!-- Scorecards -->
+            <section class="scorecards">
+                <div class="card">
+                    <div class="card-icon"><i class='bx bx-package'></i></div>
+                    <div class="card-info">
+                        <p>Tổng Sản Lượng (Đơn)</p>
+                        <h3 id="score-volume">0</h3>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon weight-icon"><i class='bx bx-dumbbell'></i></div>
+                    <div class="card-info">
+                        <p>Tổng Khối Lượng (Kg)</p>
+                        <h3 id="score-weight">0</h3>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon opr-icon"><i class='bx bx-check-shield'></i></div>
+                    <div class="card-info">
+                        <p>OPR Trung Bình</p>
+                        <h3 id="score-opr">0%</h3>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon shop-icon"><i class='bx bx-store-alt'></i></div>
+                    <div class="card-info">
+                        <p>Tổng Số Shop</p>
+                        <h3 id="score-shops">0</h3>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon drop-icon" style="background-color: rgba(249, 115, 22, 0.2); color: #f97316;"><i class='bx bx-calendar-star'></i></div>
+                    <div class="card-info">
+                        <p>Ngày >1000 Đơn</p>
+                        <h3 id="score-days-1000">0</h3>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Alerts Section -->
+            <section class="alerts-section" id="alerts-container">
+                <!-- Alerts will be dynamically injected here -->
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-grid">
+                <div class="chart-container span-2">
+                    <h3>Top 15 Shop Lớn Nhất (Cảnh Báo OPR < 90%)</h3>
+                    <div class="canvas-wrapper"><canvas id="chart-top-shops"></canvas></div>
+                </div>
+                <div class="chart-container">
+                    <h3>Phân Bổ Theo Nhóm</h3>
+                    <div class="canvas-wrapper"><canvas id="chart-shop-distribution"></canvas></div>
+                </div>
+                <div class="chart-container span-3">
+                    <h3>Top Shop Cần Focus (Cảnh Báo Sản Lượng Cao & OPR Thấp)</h3>
+                    <div class="canvas-wrapper"><canvas id="chart-focus-shops"></canvas></div>
+                </div>
+                <div class="chart-container span-3">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3>Xu Hướng Phong Độ Shop (3 Tháng)</h3>
+                        <select id="trend-shop-select" style="padding: 0.5rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px; width: 300px;">
+                            <option value="">-- Chọn Shop --</option>
+                        </select>
+                    </div>
+                    <div class="canvas-wrapper"><canvas id="chart-shop-trend"></canvas></div>
+                </div>
+            </section>
+
+            <!-- Heatmap Section -->
+            <section class="heatmap-section">
+                <h3>Bảng Đồ Nhiệt (Heatmap) Theo Vùng</h3>
+                <div id="heatmap-container" class="heatmap-grid">
+                    <!-- HTML Heatmaps injected here -->
+                </div>
+            </section>
+            </div> <!-- End tab-dashboard -->
+
+            <div id="tab-data" class="tab-content">
+            <!-- Data Table Section -->
+            <section class="data-table-section">
+                <div class="table-header">
+                    <h3>Bảng Dữ Liệu Chi Tiết (Như File Gốc)</h3>
+                </div>
+                <div class="table-responsive">
+                    <table id="details-table">
+                        <thead>
+                            <tr>
+                                <th>Tháng</th>
+                                <th>Vùng</th>
+                                <th>Tỉnh</th>
+                                <th>Quận</th>
+                                <th>Mã BC Lấy</th>
+                                <th>Bưu Cục Lấy</th>
+                                <th>Tên Khách Hàng (Shop)</th>
+                                <th>Nhóm Sản Lượng</th>
+                                <th>Tổng Vol</th>
+                                <th>Tổng KL (Kg)</th>
+                                <th>Số Ngày Phái Sinh Đơn</th>
+                                <th>Số Ngày > 1000 Đơn</th>
+                                <th>Vol TB/Ngày</th>
+                                <th>KL TB/Ngày (Kg)</th>
+                                <th>% Đơn < 5kg</th>
+                                <th>% Nội Vùng</th>
+                                <th>% Liên Vùng</th>
+                                <th>OPR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            </div> <!-- End tab-data -->
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
