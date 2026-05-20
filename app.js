@@ -778,6 +778,9 @@ function updateTable() {
             <td>${formatPercent(row.pct_don_lien_vung || 0)}</td>
             <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(rotLc)}</td>
             <td style="background-color: ${oprBg}; color: white; font-weight: bold">${formatPercent(row.pct_opr)}</td>
+            <td>${formatPercent(row.pct_gio_0_9 || 0)}</td>
+            <td>${formatPercent(row.pct_gio_9_19 || 0)}</td>
+            <td>${formatPercent(row.pct_gio_19p || 0)}</td>
         `;
         tbody.appendChild(tr);
     });
