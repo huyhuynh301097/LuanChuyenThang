@@ -27,8 +27,16 @@ function loadData() {
         header: true,
         dynamicTyping: true,
         complete: function(results) {
+            console.log("=== GHN CSV Loading Debug ===");
+            console.log("1. Total raw lines parsed from CSV:", results.data ? results.data.length : 0);
+            if (results.errors && results.errors.length > 0) {
+                console.error("2. PapaParse encountered errors:", results.errors);
+            }
+            
             // Process Data: Add custom volume group based on user logic
-            rawData = results.data.filter(row => row.warehouse_id != null).map(row => {
+            rawData = results.data.filter(row => {
+                return row.warehouse_id !== null && row.warehouse_id !== undefined;
+            }).map(row => {
                 const volTbNgay = row.vol_tb_ngay || 0;
                 let nhomSanLuong = '';
                 
@@ -47,17 +55,41 @@ function loadData() {
                 const hubName = row.warehouse_name || '';
                 const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
 
+                // Map new schema fields to keep compatibility with existing code
+                const kl = row.kl !== undefined ? row.kl : (row['kl(kg)'] || 0);
+                const soNgay = row.so_ngay !== undefined ? row.so_ngay : (row.so_ngay_phat_sinh_don || 0);
+                const soNgay1000 = row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : (row.so_ngay_tren_1000_don || 0);
+                const klTbNgay = row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : (row['kl_tb_ngay(kg)'] || 0);
+                const pctDuoi5kg = row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : (row.pct_don_duoi_5kg || 0);
+                const pctNoiVung = row.pct_noi_vung !== undefined ? row.pct_noi_vung : (row.pct_don_noi_vung || 0);
+                const pctLienVung = row.pct_lien_vung !== undefined ? row.pct_don_lien_vung : (row.pct_don_lien_vung || 0);
+
                 return {
                     ...row,
                     nhom_san_luong: nhomSanLuong,
                     hub_type: hubType,
-                    // Handle potential NaN values
+                    // Handled properties
                     vol: row.vol || 0,
-                    'kl(kg)': row['kl(kg)'] || 0,
+                    'kl(kg)': kl,
+                    so_ngay_phat_sinh_don: soNgay,
+                    so_ngay_tren_1000_don: soNgay1000,
+                    'kl_tb_ngay(kg)': klTbNgay,
+                    pct_don_duoi_5kg: pctDuoi5kg,
+                    pct_don_noi_vung: pctNoiVung,
+                    pct_don_lien_vung: pctLienVung,
                     pct_opr: row.pct_opr || 0,
-                    pct_rot_lc: row.pct_rot_lc || 0
+                    pct_rot_lc: row.pct_rot_lc || 0,
+                    // New indicators
+                    vol_delivered: row.vol_delivered || 0,
+                    pct_odr: row.pct_odr || 0,
+                    pct_longtail: row.pct_longtail || 0
                 };
             });
+
+            console.log("3. Total rawData rows mapped successfully:", rawData.length);
+            if (rawData.length > 0) {
+                console.log("4. Sample row data:", rawData[0]);
+            }
 
             filteredData = [...rawData];
             
@@ -168,6 +200,18 @@ function setupEventListeners() {
     // Trend Shop Select
     document.getElementById('trend-shop-select').addEventListener('change', renderShopTrendChart);
 
+    // Focus Shop Chart Toggle
+    const focusToggleContainer = document.getElementById('focus-chart-toggle');
+    if (focusToggleContainer) {
+        focusToggleContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-toggle');
+            if (!btn) return;
+            focusToggleContainer.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderFocusShopsChart();
+        });
+    }
+
     // Detail Shop Search Slicer
     const detailShopSearch = document.getElementById('detail-shop-search');
     if (detailShopSearch) {
@@ -246,6 +290,18 @@ function updateScorecards() {
     const avgOpr = totalVol > 0 ? (totalOprVol / totalVol) : 0;
     const avgRotLc = totalVol > 0 ? (totalRotLcVol / totalVol) : 0;
     
+    // Weighted Average ODR & Longtail (weighted by vol_delivered)
+    let totalOdrDelivered = 0;
+    let totalLongtailDelivered = 0;
+    let totalDeliveredVol = 0;
+    filteredData.forEach(row => {
+        totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
+        totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
+        totalDeliveredVol += (row.vol_delivered || 0);
+    });
+    const avgOdr = totalDeliveredVol > 0 ? (totalOdrDelivered / totalDeliveredVol) : 0;
+    const avgLongtail = totalDeliveredVol > 0 ? (totalLongtailDelivered / totalDeliveredVol) : 0;
+    
     const totalShops = filteredData.length;
 
     const elVol = document.getElementById('score-volume');
@@ -264,6 +320,12 @@ function updateScorecards() {
     if (scoreTransferDrop) {
         scoreTransferDrop.textContent = formatPercent(avgRotLc);
     }
+
+    const elOdr = document.getElementById('score-odr');
+    if (elOdr) elOdr.textContent = formatPercent(avgOdr);
+
+    const elLongtail = document.getElementById('score-longtail');
+    if (elLongtail) elLongtail.textContent = formatPercent(avgLongtail);
 }
 
 // Chart Configurations
@@ -283,19 +345,60 @@ function renderCharts() {
 function renderFocusShopsChart() {
     const ctx = document.getElementById('chart-focus-shops').getContext('2d');
 
-    let focusShops = filteredData.filter(d => d.vol_tb_ngay >= 10 && d.pct_opr < 0.9);
-    if (focusShops.length < 5) {
-        focusShops = filteredData.filter(d => d.vol_tb_ngay >= 5 && d.pct_opr < 0.9);
-    }
-    focusShops.sort((a, b) => b.vol_tb_ngay - a.vol_tb_ngay);
+    // Filter focus shops with a volume of >= 5 and at least one underperforming index
+    let focusShops = filteredData.filter(d => 
+        d.vol_tb_ngay >= 5 && (
+            (d.pct_opr > 0 && d.pct_opr < 0.9) || 
+            (d.pct_rot_lc > 0.02) || 
+            (d.pct_odr > 0 && d.pct_odr < 0.92) || 
+            (d.pct_longtail > 0.08)
+        )
+    );
+
+    // Sort by combined Risk Index (Volume * combined failures)
+    focusShops.sort((a, b) => {
+        const riskA = a.vol_tb_ngay * ((1 - a.pct_opr) + (a.pct_rot_lc || 0) + 1.5 * (1 - a.pct_odr) + 1.5 * (a.pct_longtail || 0));
+        const riskB = b.vol_tb_ngay * ((1 - b.pct_opr) + (b.pct_rot_lc || 0) + 1.5 * (1 - b.pct_odr) + 1.5 * (b.pct_longtail || 0));
+        return riskB - riskA;
+    });
+    
     focusShops = focusShops.slice(0, 20);
 
     // Hiển thị full tên shop (không cắt)
     const labels = focusShops.map(s => s.ten_kh || s.warehouse_name || 'Unknown');
+    const volData = focusShops.map(s => s.vol_tb_ngay);
 
-    const volData   = focusShops.map(s => s.vol_tb_ngay);
-    const oprData   = focusShops.map(s => s.pct_opr * 100);
-    const rotLcData = focusShops.map(s => (s.pct_rot_lc || 0) * 100);
+    // Check toggle state (sla vs ops)
+    const activeBtn = document.querySelector('#focus-chart-toggle .btn-toggle.active');
+    const metricMode = activeBtn ? activeBtn.dataset.metric : 'sla';
+
+    let line1Label = '';
+    let line1Data = [];
+    let line1Color = '';
+    let line1Align = 'bottom';
+    
+    let line2Label = '';
+    let line2Data = [];
+    let line2Color = '';
+    let line2Align = 'top';
+
+    if (metricMode === 'sla') {
+        line1Label = 'ODR (%)';
+        line1Data = focusShops.map(s => (s.pct_odr || 0) * 100);
+        line1Color = 'rgba(20, 184, 166, 1)'; // Teal
+
+        line2Label = '% Longtail (%)';
+        line2Data = focusShops.map(s => (s.pct_longtail || 0) * 100);
+        line2Color = 'rgba(249, 115, 22, 1)'; // Orange
+    } else {
+        line1Label = 'OPR (%)';
+        line1Data = focusShops.map(s => s.pct_opr * 100);
+        line1Color = 'rgba(168, 85, 247, 1)'; // Purple
+
+        line2Label = '% Rớt LC (%)';
+        line2Data = focusShops.map(s => (s.pct_rot_lc || 0) * 100);
+        line2Color = 'rgba(239, 68, 68, 1)'; // Red
+    }
 
     if (charts.focusShops) charts.focusShops.destroy();
 
@@ -306,10 +409,10 @@ function renderFocusShopsChart() {
             datasets: [
                 {
                     type: 'line',
-                    label: 'OPR (%)',
-                    data: oprData,
-                    borderColor: 'rgba(168, 85, 247, 1)',
-                    backgroundColor: 'rgba(168, 85, 247, 1)',
+                    label: line1Label,
+                    data: line1Data,
+                    borderColor: line1Color,
+                    backgroundColor: line1Color,
                     borderWidth: 2,
                     yAxisID: 'y1',
                     tension: 0.3,
@@ -317,18 +420,18 @@ function renderFocusShopsChart() {
                     order: 1,
                     datalabels: {
                         display: true,
-                        color: 'rgba(168, 85, 247, 1)',
-                        align: 'bottom',
+                        color: line1Color,
+                        align: line1Align,
                         font: { weight: 'bold', size: 10 },
                         formatter: function(value) { return value.toFixed(1) + '%'; }
                     }
                 },
                 {
                     type: 'line',
-                    label: '% Rớt LC (%)',
-                    data: rotLcData,
-                    borderColor: 'rgba(239, 68, 68, 1)',
-                    backgroundColor: 'rgba(239, 68, 68, 1)',
+                    label: line2Label,
+                    data: line2Data,
+                    borderColor: line2Color,
+                    backgroundColor: line2Color,
                     borderWidth: 2,
                     yAxisID: 'y1',
                     tension: 0.3,
@@ -336,8 +439,8 @@ function renderFocusShopsChart() {
                     order: 2,
                     datalabels: {
                         display: true,
-                        color: 'rgba(239, 68, 68, 1)',
-                        align: 'top',
+                        color: line2Color,
+                        align: line2Align,
                         font: { weight: 'bold', size: 10 },
                         formatter: function(value) { return value.toFixed(1) + '%'; }
                     }
@@ -407,18 +510,21 @@ function renderFocusShopsChart() {
                                 .filter(r => r.ten_kh === shopName && r.warehouse_name === hubName)
                                 .sort((a, b) => (a.thang || '').localeCompare(b.thang || ''));
 
-                            // Bỏ prefix "Bưu Cục:", chỉ ghi thẳng tên
                             let lines = [
                                 `${hubName || 'Không rõ'}`,
                                 `KL TB: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
                                 `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
-                                '─── Lịch Sử % Rớt LC ───'
+                                `SLA: ODR ${(shop.pct_odr * 100).toFixed(1)}% | Longtail ${(shop.pct_longtail * 100).toFixed(1)}%`,
+                                `Vận Hành: OPR ${(shop.pct_opr * 100).toFixed(1)}% | Rớt LC ${((shop.pct_rot_lc || 0) * 100).toFixed(1)}%`,
+                                '─── Lịch Sử 3 Tháng ───'
                             ];
                             history.forEach(h => {
+                                const odrPct = ((h.pct_odr || 0) * 100).toFixed(1);
+                                const longtailPct = ((h.pct_longtail || 0) * 100).toFixed(1);
                                 const rotLcPct = ((h.pct_rot_lc || 0) * 100).toFixed(1);
                                 const oprPct   = (h.pct_opr * 100).toFixed(1);
                                 const vol      = Math.round(h.vol_tb_ngay || 0);
-                                lines.push(`T${h.thang || '?'}: ${vol} đơn/ng | Rớt LC ${rotLcPct}% | OPR ${oprPct}%`);
+                                lines.push("T" + (h.thang || '?') + ": " + vol + " đơn | ODR " + odrPct + "% | Longtail " + longtailPct + "% | Rớt LC " + rotLcPct + "%");
                             });
                             return lines;
                         },
@@ -543,6 +649,8 @@ function renderShopTrendChart() {
     const volData = shopData.map(d => d.vol_tb_ngay || 0);
     const oprData = shopData.map(d => d.pct_opr * 100);
     const rotLcData = shopData.map(d => (d.pct_rot_lc || 0) * 100);
+    const odrData = shopData.map(d => (d.pct_odr || 0) * 100);
+    const longtailData = shopData.map(d => (d.pct_longtail || 0) * 100);
 
     if (charts.trend) charts.trend.destroy();
 
@@ -558,7 +666,7 @@ function renderShopTrendChart() {
                     borderColor: 'rgba(59, 130, 246, 1)',
                     backgroundColor: 'rgba(59, 130, 246, 0.8)',
                     yAxisID: 'y',
-                    order: 3,
+                    order: 5,
                     datalabels: {
                         display: true,
                         color: 'rgba(241, 245, 249, 1)',
@@ -603,6 +711,42 @@ function renderShopTrendChart() {
                         font: { weight: 'bold', size: 10 },
                         formatter: function(value) { return value.toFixed(1) + '%'; }
                     }
+                },
+                {
+                    type: 'line',
+                    label: 'ODR (%)',
+                    data: odrData,
+                    borderColor: 'rgba(20, 184, 166, 1)',
+                    backgroundColor: 'rgba(20, 184, 166, 1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    yAxisID: 'y1',
+                    order: 3,
+                    datalabels: {
+                        display: true,
+                        color: 'rgba(20, 184, 166, 1)',
+                        align: 'bottom',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: function(value) { return value.toFixed(1) + '%'; }
+                    }
+                },
+                {
+                    type: 'line',
+                    label: '% Longtail (%)',
+                    data: longtailData,
+                    borderColor: 'rgba(249, 115, 22, 1)',
+                    backgroundColor: 'rgba(249, 115, 22, 1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    yAxisID: 'y1',
+                    order: 4,
+                    datalabels: {
+                        display: true,
+                        color: 'rgba(249, 115, 22, 1)',
+                        align: 'top',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: function(value) { return value.toFixed(1) + '%'; }
+                    }
                 }
             ]
         },
@@ -623,7 +767,7 @@ function renderShopTrendChart() {
                             if (label) {
                                 label += ': ';
                             }
-                            if (context.datasetIndex === 1 || context.datasetIndex === 2) {
+                            if (context.datasetIndex >= 1 && context.datasetIndex <= 4) {
                                 label += context.raw.toFixed(1) + '%';
                             } else {
                                 label += Math.round(context.raw).toLocaleString();
@@ -737,7 +881,8 @@ function updateTable() {
         else if (row.nhom_san_luong.startsWith('4')) badgeClass = 'badge-4';
         else if (row.nhom_san_luong.startsWith('5')) badgeClass = 'badge-5';
 
-        if (row.pct_opr < 0.9) {
+        // Highlight low OPR, low ODR, or high Longtail in red
+        if (row.pct_opr < 0.9 || row.pct_odr < 0.92 || row.pct_longtail > 0.08) {
             tr.className = 'danger-row';
         }
 
@@ -757,6 +902,19 @@ function updateTable() {
         else if (rotLc <= 0.10) rotLcBg = '#f97316'; // Orange (High Risk)
         else rotLcBg = '#ef4444'; // Red (Critical)
 
+        let odrBg = '';
+        if (row.pct_odr < 0.85) odrBg = '#ef4444';
+        else if (row.pct_odr < 0.90) odrBg = '#f97316';
+        else if (row.pct_odr < 0.95) odrBg = '#eab308';
+        else odrBg = '#22c55e';
+
+        let longtailBg = '';
+        const longtail = row.pct_longtail || 0;
+        if (longtail <= 0.05) longtailBg = '#22c55e';
+        else if (longtail <= 0.10) longtailBg = '#eab308';
+        else if (longtail <= 0.15) longtailBg = '#f97316';
+        else longtailBg = '#ef4444';
+
         tr.innerHTML = `
             <td>${row.thang || '-'}</td>
             <td>${row.vung || '-'}</td>
@@ -768,6 +926,7 @@ function updateTable() {
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
             <td><span class="badge ${badgeClass}">${row.nhom_san_luong}</span></td>
             <td style="background-color: ${volBg}; font-weight: bold;">${formatNumber(row.vol)}</td>
+            <td style="font-weight: bold; color: var(--text-main);">${formatNumber(row.vol_delivered || 0)}</td>
             <td>${formatNumber(row['kl(kg)'])}</td>
             <td>${row.so_ngay_phat_sinh_don || '-'}</td>
             <td>${row.so_ngay_tren_1000_don || '-'}</td>
@@ -778,6 +937,8 @@ function updateTable() {
             <td>${formatPercent(row.pct_don_lien_vung || 0)}</td>
             <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(rotLc)}</td>
             <td style="background-color: ${oprBg}; color: white; font-weight: bold">${formatPercent(row.pct_opr)}</td>
+            <td style="background-color: ${odrBg}; color: white; font-weight: bold">${formatPercent(row.pct_odr || 0)}</td>
+            <td style="background-color: ${longtailBg}; color: white; font-weight: bold">${formatPercent(row.pct_longtail || 0)}</td>
             <td>${formatPercent(row.pct_gio_0_9 || 0)}</td>
             <td>${formatPercent(row.pct_gio_9_19 || 0)}</td>
             <td>${formatPercent(row.pct_gio_19p || 0)}</td>
@@ -786,7 +947,7 @@ function updateTable() {
     });
 
     if (tableData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="26" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
     }
 }
 
@@ -795,14 +956,27 @@ function generateAlerts() {
     const alertsContainer = document.getElementById('alerts-container');
     alertsContainer.innerHTML = '';
 
-    // Calculate OPR and % Rớt LC by District
+    // Calculate OPR, % Rớt LC, ODR, and Longtail by District
     const districtData = {};
     filteredData.forEach(row => {
         const d = row.quan || 'Unknown';
-        if (!districtData[d]) districtData[d] = { vol: 0, totalOprVol: 0, totalRotLcVol: 0, vung: row.vung };
+        if (!districtData[d]) {
+            districtData[d] = { 
+                vol: 0, 
+                totalOprVol: 0, 
+                totalRotLcVol: 0, 
+                totalOdrDelivered: 0,
+                totalLongtailDelivered: 0,
+                totalDeliveredVol: 0,
+                vung: row.vung 
+            };
+        }
         districtData[d].vol += row.vol;
         districtData[d].totalOprVol += (row.pct_opr * row.vol);
         districtData[d].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
+        districtData[d].totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
+        districtData[d].totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
+        districtData[d].totalDeliveredVol += (row.vol_delivered || 0);
     });
 
     const badDistricts = Object.entries(districtData)
@@ -811,12 +985,21 @@ function generateAlerts() {
             vung: data.vung,
             vol: data.vol,
             opr: data.vol > 0 ? (data.totalOprVol / data.vol) : 0,
-            rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0
+            rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0,
+            odr: data.totalDeliveredVol > 0 ? (data.totalOdrDelivered / data.totalDeliveredVol) : 0,
+            longtail: data.totalDeliveredVol > 0 ? (data.totalLongtailDelivered / data.totalDeliveredVol) : 0
         }))
-        .filter(d => ((d.opr > 0 && d.opr < 0.9) || d.rotLc > 0.02) && d.vol >= 100) // Filter OPR < 90% or Rớt LC > 2%
+        // Filter districts that have low OPR, high Rot LC, low ODR, OR high Longtail, with minimum 100 volume
+        .filter(d => (
+            (d.opr > 0 && d.opr < 0.9) || 
+            d.rotLc > 0.02 || 
+            (d.odr > 0 && d.odr < 0.92) || 
+            d.longtail > 0.08
+        ) && d.vol >= 100)
         .sort((a, b) => {
-            const riskA = a.vol * ((1 - a.opr) + a.rotLc);
-            const riskB = b.vol * ((1 - b.opr) + b.rotLc);
+            // Combined risk with 1.5x weight for SLA metrics (ODR, Longtail)
+            const riskA = a.vol * ((1 - a.opr) + a.rotLc + 1.5 * (1 - a.odr) + 1.5 * a.longtail);
+            const riskB = b.vol * ((1 - b.opr) + b.rotLc + 1.5 * (1 - b.odr) + 1.5 * b.longtail);
             return riskB - riskA; // High combined risk first
         });
 
@@ -828,8 +1011,8 @@ function generateAlerts() {
             alertCard.innerHTML = `
                 <i class='bx bx-error-circle'></i>
                 <div class="alert-content">
-                    <h4>Cảnh Báo Quận/Huyện: Vận Hành Suy Giảm tại ${d.name} (${d.vung})</h4>
-                    <p>Trung bình OPR chỉ đạt <strong>${(d.opr * 100).toFixed(2)}%</strong> và Tỷ lệ rớt luân chuyển ở mức <strong style="color: ${d.rotLc > 0.05 ? '#ef4444' : '#f97316'}">${(d.rotLc * 100).toFixed(2)}%</strong> với tổng sản lượng lớn (${formatNumber(d.vol)} đơn). Ảnh hưởng khoảng <strong>${formatNumber(Math.round(d.vol * ((1 - d.opr) + d.rotLc)))}</strong> đơn hàng lỗi/chậm trễ!</p>
+                    <h4>Cảnh Báo Quận/Huyện: Suy Giảm Chất Lượng tại ${d.name} (${d.vung})</h4>
+                    <p>SLA giao nhận bị ảnh hưởng lớn: ODR chỉ đạt <strong style="color: ${d.odr < 0.90 ? '#ef4444' : '#f97316'}">${(d.odr * 100).toFixed(1)}%</strong>, tỷ lệ Longtail trễ hạn ở mức <strong style="color: ${d.longtail > 0.10 ? '#ef4444' : '#f97316'}">${(d.longtail * 100).toFixed(1)}%</strong>. Chỉ số vận hành OPR: <strong>${(d.opr * 100).toFixed(1)}%</strong>, Rớt LC: <strong>${(d.rotLc * 100).toFixed(1)}%</strong> (Tổng vol: ${formatNumber(d.vol)} đơn).</p>
                 </div>
             `;
             alertsContainer.appendChild(alertCard);
@@ -838,11 +1021,16 @@ function generateAlerts() {
 
     // Add Shop Alerts
     const badShops = [...filteredData]
-        .filter(d => (d.pct_opr > 0 && d.pct_opr < 0.9) || d.pct_rot_lc > 0.02)
+        .filter(d => 
+            (d.pct_opr > 0 && d.pct_opr < 0.9) || 
+            d.pct_rot_lc > 0.02 ||
+            (d.pct_odr > 0 && d.pct_odr < 0.92) ||
+            d.pct_longtail > 0.08
+        )
         .filter(d => d.vol_tb_ngay >= 10)
         .sort((a, b) => {
-            const riskA = a.vol * ((1 - a.pct_opr) + (a.pct_rot_lc || 0));
-            const riskB = b.vol * ((1 - b.pct_opr) + (b.pct_rot_lc || 0));
+            const riskA = a.vol * ((1 - a.pct_opr) + (a.pct_rot_lc || 0) + 1.5 * (1 - a.pct_odr) + 1.5 * (a.pct_longtail || 0));
+            const riskB = b.vol * ((1 - b.pct_opr) + (b.pct_rot_lc || 0) + 1.5 * (1 - b.pct_odr) + 1.5 * (b.pct_longtail || 0));
             return riskB - riskA; // High combined risk first
         });
 
@@ -855,17 +1043,23 @@ function generateAlerts() {
             
             let shopAlertTitle = '';
             let shopAlertDesc = '';
-            const sRotLc = s.pct_rot_lc || 0;
             
-            if (s.pct_opr < 0.9 && sRotLc > 0.02) {
-                shopAlertTitle = `Cảnh Báo Shop OPR Thấp & Rớt LC Cao: ${s.ten_kh}`;
-                shopAlertDesc = `Shop đồng thời gặp OPR thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> và Rớt luân chuyển cao <strong>${(sRotLc * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn).`;
+            const sRotLc = s.pct_rot_lc || 0;
+            const sOdr = s.pct_odr || 0;
+            const sLongtail = s.pct_longtail || 0;
+            
+            if ((sOdr < 0.92 || sLongtail > 0.08) && (s.pct_opr < 0.9 || sRotLc > 0.02)) {
+                shopAlertTitle = `Cảnh Báo Shop Suy Giảm SLA & Vận Hành: ${s.ten_kh}`;
+                shopAlertDesc = `Shop đồng thời gặp ODR thấp <strong>${(sOdr * 100).toFixed(1)}%</strong> (Longtail: <strong>${(sLongtail * 100).toFixed(1)}%</strong>) và OPR kém <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày.`;
+            } else if (sOdr < 0.92 || sLongtail > 0.08) {
+                shopAlertTitle = `Cảnh Báo Shop Trễ Hẹn SLA Giao: ${s.ten_kh}`;
+                shopAlertDesc = `Chất lượng giao hàng kém tại BC ${s.warehouse_name}: ODR đạt <strong>${(sOdr * 100).toFixed(1)}%</strong>, tỷ lệ Longtail trễ hạn lên tới <strong style="color: #f43f5e">${(sLongtail * 100).toFixed(1)}%</strong>. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn).`;
             } else if (sRotLc > 0.02) {
                 shopAlertTitle = `Cảnh Báo Shop Rớt LC Cao: ${s.ten_kh}`;
-                shopAlertDesc = `Tỷ lệ rớt luân chuyển cao ở mức <strong>${(sRotLc * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn).`;
+                shopAlertDesc = `Tỷ lệ rớt luân chuyển cao ở mức <strong>${(sRotLc * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (OPR: ${(s.pct_opr * 100).toFixed(1)}%).`;
             } else {
                 shopAlertTitle = `Cảnh Báo Shop OPR Thấp: ${s.ten_kh}`;
-                shopAlertDesc = `OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn). Số ngày có vol > 1000 đơn: ${s.so_ngay_tren_1000_don || 0} ngày.`;
+                shopAlertDesc = `OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày. Số ngày có vol > 1000 đơn: ${s.so_ngay_tren_1000_don || 0} ngày.`;
             }
 
             alertCard.innerHTML = `
@@ -972,6 +1166,9 @@ function calculateShopGroups() {
                 vol_tb_ngay_count: 0,
                 opr_vol_sum: 0,
                 rot_lc_vol_sum: 0,
+                odr_vol_sum: 0,
+                longtail_vol_sum: 0,
+                delivered_vol_sum: 0,
                 kl: 0
             };
         }
@@ -982,6 +1179,9 @@ function calculateShopGroups() {
         s.vol_tb_ngay_count++;
         s.opr_vol_sum += (row.pct_opr || 0) * (row.vol || 0);
         s.rot_lc_vol_sum += ((row.pct_rot_lc || 0) * (row.vol || 0));
+        s.odr_vol_sum += ((row.pct_odr || 0) * (row.vol_delivered || 0));
+        s.longtail_vol_sum += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
+        s.delivered_vol_sum += (row.vol_delivered || 0);
         s.kl += row['kl(kg)'] || 0;
     });
 
@@ -994,12 +1194,17 @@ function calculateShopGroups() {
             const avgVolTbNgay = s.vol_tb_ngay_count > 0 ? (s.vol_tb_ngay_sum / s.vol_tb_ngay_count) : 0;
             const weightedOpr = s.vol > 0 ? (s.opr_vol_sum / s.vol) : 0;
             const weightedRotLc = s.vol > 0 ? (s.rot_lc_vol_sum / s.vol) : 0;
+            const weightedOdr = s.delivered_vol_sum > 0 ? (s.odr_vol_sum / s.delivered_vol_sum) : 0;
+            const weightedLongtail = s.delivered_vol_sum > 0 ? (s.longtail_vol_sum / s.delivered_vol_sum) : 0;
             return {
                 ten_kh: s.ten_kh,
                 avg_vol_tb_ngay: avgVolTbNgay,
                 weighted_opr: weightedOpr,
                 weighted_rot_lc: weightedRotLc,
+                weighted_odr: weightedOdr,
+                weighted_longtail: weightedLongtail,
                 total_vol: s.vol,
+                total_delivered_vol: s.delivered_vol_sum,
                 total_weight: s.kl
             };
         })
@@ -1016,8 +1221,11 @@ function calculateShopGroups() {
                 const s2 = candidateShops[j];
                 
                 const combinedVol = s1.total_vol + s2.total_vol;
+                const combinedDelivered = s1.total_delivered_vol + s2.total_delivered_vol;
                 const combinedOpr = combinedVol > 0 ? ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol)) / combinedVol : 0;
                 const combinedRotLc = combinedVol > 0 ? ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol)) / combinedVol : 0;
+                const combinedOdr = combinedDelivered > 0 ? ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol)) / combinedDelivered : 0;
+                const combinedLongtail = combinedDelivered > 0 ? ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol)) / combinedDelivered : 0;
                 
                 recommendations.push({
                     quan,
@@ -1025,8 +1233,11 @@ function calculateShopGroups() {
                     shops: [s1, s2],
                     combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay,
                     combined_vol: combinedVol,
+                    combined_delivered_vol: combinedDelivered,
                     combined_opr: combinedOpr,
-                    combined_rot_lc: combinedRotLc
+                    combined_rot_lc: combinedRotLc,
+                    combined_odr: combinedOdr,
+                    combined_longtail: combinedLongtail
                 });
             }
         }
@@ -1041,10 +1252,15 @@ function calculateShopGroups() {
                         const s3 = candidateShops[k];
                         
                         const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
+                        const combinedDelivered = s1.total_delivered_vol + s2.total_delivered_vol + s3.total_delivered_vol;
                         const combinedOpr = combinedVol > 0 ? 
                             ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol) + (s3.weighted_opr * s3.total_vol)) / combinedVol : 0;
                         const combinedRotLc = combinedVol > 0 ? 
                             ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol) + (s3.weighted_rot_lc * s3.total_vol)) / combinedVol : 0;
+                        const combinedOdr = combinedDelivered > 0 ? 
+                            ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol) + (s3.weighted_odr * s3.total_delivered_vol)) / combinedDelivered : 0;
+                        const combinedLongtail = combinedDelivered > 0 ? 
+                            ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol) + (s3.weighted_longtail * s3.total_delivered_vol)) / combinedDelivered : 0;
                         
                         recommendations.push({
                             quan,
@@ -1052,8 +1268,11 @@ function calculateShopGroups() {
                             shops: [s1, s2, s3],
                             combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay + s3.avg_vol_tb_ngay,
                             combined_vol: combinedVol,
+                            combined_delivered_vol: combinedDelivered,
                             combined_opr: combinedOpr,
-                            combined_rot_lc: combinedRotLc
+                            combined_rot_lc: combinedRotLc,
+                            combined_odr: combinedOdr,
+                            combined_longtail: combinedLongtail
                         });
                     }
                 }
@@ -1101,7 +1320,7 @@ function updateGroupingTab() {
     });
 
     if (filteredGroups.length === 0) {
-        table.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
+        table.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
         return;
     }
 
@@ -1120,8 +1339,22 @@ function updateGroupingTab() {
         else if (g.combined_rot_lc <= 0.10) rotLcBg = '#f97316';
         else rotLcBg = '#ef4444';
 
+        let odrBg = '';
+        if (g.combined_odr < 0.85) odrBg = '#ef4444';
+        else if (g.combined_odr < 0.90) odrBg = '#f97316';
+        else if (g.combined_odr < 0.95) odrBg = '#eab308';
+        else odrBg = '#22c55e';
+
+        let longtailBg = '';
+        if (g.combined_longtail <= 0.05) longtailBg = '#22c55e';
+        else if (g.combined_longtail <= 0.10) longtailBg = '#eab308';
+        else if (g.combined_longtail <= 0.15) longtailBg = '#f97316';
+        else longtailBg = '#ef4444';
+
         let statusBadge = '';
-        if (g.combined_vol_tb_ngay >= 1000) {
+        if (g.combined_odr < 0.90 || g.combined_longtail > 0.08) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.2)); color: #f43f5e; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;">Cải Thiện SLA</span>';
+        } else if (g.combined_vol_tb_ngay >= 1000) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20, 184, 166, 0.2)); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Siêu Tiềm Năng</span>';
         } else if (g.combined_vol_tb_ngay >= 500) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.2)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Khả Thi Cao</span>';
@@ -1135,6 +1368,8 @@ function updateGroupingTab() {
         g.shops.forEach(s => {
             let shopOprColor = s.weighted_opr < 0.9 ? '#f43f5e' : '#14b8a6';
             let shopRotLcColor = s.weighted_rot_lc > 0.02 ? '#f43f5e' : '#14b8a6';
+            let shopOdrColor = s.weighted_odr < 0.92 ? '#f43f5e' : '#14b8a6';
+            let shopLongtailColor = s.weighted_longtail > 0.08 ? '#f43f5e' : '#14b8a6';
             shopListHtml += `
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(51, 65, 85, 0.4); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(51, 65, 85, 0.6); white-space: nowrap;">
                     <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; text-align: left;" title="${s.ten_kh}">${s.ten_kh}</span>
@@ -1142,6 +1377,8 @@ function updateGroupingTab() {
                         <span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">${formatNumber(s.avg_vol_tb_ngay)} đơn</span>
                         <span class="badge" style="background-color: rgba(239, 68, 68, 0.15); color: ${shopRotLcColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">Rớt: ${formatPercent(s.weighted_rot_lc)}</span>
                         <span class="badge" style="background-color: rgba(20, 184, 166, 0.15); color: ${shopOprColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">OPR: ${formatPercent(s.weighted_opr)}</span>
+                        <span class="badge" style="background-color: rgba(20, 184, 166, 0.15); color: ${shopOdrColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">ODR: ${formatPercent(s.weighted_odr)}</span>
+                        <span class="badge" style="background-color: rgba(249, 115, 22, 0.15); color: ${shopLongtailColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">LT: ${formatPercent(s.weighted_longtail)}</span>
                     </div>
                 </div>
             `;
@@ -1169,6 +1406,8 @@ function updateGroupingTab() {
             <td style="text-align: right; vertical-align: middle; font-weight: bold; color: var(--text-main); font-family: monospace; font-size: 0.9rem;">${formatNumber(g.combined_vol)} đơn</td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${rotLcBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_rot_lc)}</span></td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${oprBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_opr)}</span></td>
+            <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${odrBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_odr)}</span></td>
+            <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${longtailBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_longtail)}</span></td>
             <td style="text-align: center; vertical-align: middle;">${statusBadge}</td>
         `;
         table.appendChild(tr);

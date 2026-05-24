@@ -99,44 +99,81 @@
 
             <div id="tab-dashboard" class="tab-content active">
                 <!-- Scorecards -->
-            <section class="scorecards">
-                <div class="card">
-                    <div class="card-icon"><i class='bx bx-package'></i></div>
-                    <div class="card-info">
-                        <p>Tổng Sản Lượng (Đơn)</p>
-                        <h3 id="score-volume">0</h3>
+            <!-- Categorized Scorecards Grid -->
+            <div class="metrics-grid">
+                <!-- Group 1: Quy Mô & Sản Lượng -->
+                <div class="metrics-group">
+                    <h4><i class='bx bx-bar-chart-square'></i> Quy Mô & Sản Lượng</h4>
+                    <div class="scorecards-subgrid">
+                        <div class="card">
+                            <div class="card-icon"><i class='bx bx-package'></i></div>
+                            <div class="card-info">
+                                <p>Tổng Sản Lượng (Đơn)</p>
+                                <h3 id="score-volume">0</h3>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon weight-icon"><i class='bx bx-dumbbell'></i></div>
+                            <div class="card-info">
+                                <p>Tổng Khối Lượng (Kg)</p>
+                                <h3 id="score-weight">0</h3>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon shop-icon"><i class='bx bx-store-alt'></i></div>
+                            <div class="card-info">
+                                <p>Tổng Số Shop</p>
+                                <h3 id="score-shops">0</h3>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-icon weight-icon"><i class='bx bx-dumbbell'></i></div>
-                    <div class="card-info">
-                        <p>Tổng Khối Lượng (Kg)</p>
-                        <h3 id="score-weight">0</h3>
+
+                <!-- Group 2: Vận Hành & Luân Chuyển -->
+                <div class="metrics-group">
+                    <h4><i class='bx bx-git-commit'></i> Vận Hành & Luân Chuyển</h4>
+                    <div class="scorecards-subgrid">
+                        <div class="card">
+                            <div class="card-icon opr-icon"><i class='bx bx-check-shield'></i></div>
+                            <div class="card-info">
+                                <p>OPR Trung Bình</p>
+                                <h3 id="score-opr">0%</h3>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon drop-icon" style="background-color: rgba(239, 68, 68, 0.1); color: var(--accent-red);"><i class='bx bx-trending-down'></i></div>
+                            <div class="card-info">
+                                <p>% Rớt Luân Chuyển</p>
+                                <h3 id="score-transfer-drop">0%</h3>
+                                <small style="color: var(--text-muted)">TB theo sản lượng</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-icon opr-icon"><i class='bx bx-check-shield'></i></div>
-                    <div class="card-info">
-                        <p>OPR Trung Bình</p>
-                        <h3 id="score-opr">0%</h3>
+
+                <!-- Group 3: Chất Lượng Dịch Vụ (SLA) -->
+                <div class="metrics-group priority-group">
+                    <h4><i class='bx bx-medal'></i> Chất Lượng Dịch Vụ (SLA) <span class="hot-badge">Trọng Tâm</span></h4>
+                    <div class="scorecards-subgrid col-2">
+                        <div class="card priority-card">
+                            <div class="card-icon odr-icon"><i class='bx bx-calendar-check'></i></div>
+                            <div class="card-info">
+                                <p>ODR Trung Bình</p>
+                                <h3 id="score-odr">0%</h3>
+                                <small style="color: var(--text-muted)">Giao đúng hẹn / Giao TC</small>
+                            </div>
+                        </div>
+                        <div class="card priority-card">
+                            <div class="card-icon longtail-icon"><i class='bx bx-timer'></i></div>
+                            <div class="card-info">
+                                <p>Tỷ Lệ Longtail</p>
+                                <h3 id="score-longtail">0%</h3>
+                                <small style="color: var(--text-muted)">Giao trễ / Giao TC</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-icon shop-icon"><i class='bx bx-store-alt'></i></div>
-                    <div class="card-info">
-                        <p>Tổng Số Shop</p>
-                        <h3 id="score-shops">0</h3>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon drop-icon" style="background-color: rgba(239, 68, 68, 0.1); color: var(--accent-red);"><i class='bx bx-trending-down'></i></div>
-                    <div class="card-info">
-                        <p>% Rớt Luân Chuyển</p>
-                        <h3 id="score-transfer-drop">0%</h3>
-                        <small style="color: var(--text-muted)">TB theo sản lượng</small>
-                    </div>
-                </div>
-            </section>
+            </div>
 
             <!-- Alerts Section -->
             <section class="alerts-section" id="alerts-container">
@@ -154,7 +191,13 @@
                     <div class="canvas-wrapper"><canvas id="chart-shop-distribution"></canvas></div>
                 </div>
                 <div class="chart-container span-3">
-                    <h3>Top Shop Cần Focus (Cảnh Báo Sản Lượng Cao & OPR Thấp)</h3>
+                    <div class="chart-header">
+                        <h3>Top Shop Cần Focus (Sản Lượng Cao & Hiệu Suất Thấp)</h3>
+                        <div class="chart-toggle-group" id="focus-chart-toggle">
+                            <button class="btn-toggle active" data-metric="sla"><i class='bx bx-medal'></i> SLA Giao (ODR & Longtail)</button>
+                            <button class="btn-toggle" data-metric="ops"><i class='bx bx-check-shield'></i> Vận Hành (OPR & Rớt LC)</button>
+                        </div>
+                    </div>
                     <div class="canvas-wrapper"><canvas id="chart-focus-shops"></canvas></div>
                 </div>
                 <div class="chart-container span-3">
@@ -190,7 +233,7 @@
                 <div class="table-responsive">
                     <table id="details-table">
                         <thead>
-                            <tr>
+                             <tr>
                                 <th>Tháng</th>
                                 <th>Vùng</th>
                                 <th>Tỉnh</th>
@@ -201,6 +244,7 @@
                                 <th>Mã Đơn Mẫu</th>
                                 <th>Nhóm Sản Lượng</th>
                                 <th>Tổng Vol</th>
+                                <th>Đơn Giao TC</th>
                                 <th>Tổng KL (Kg)</th>
                                 <th>Số Ngày Phái Sinh Đơn</th>
                                 <th>Số Ngày > 1000 Đơn</th>
@@ -211,6 +255,8 @@
                                 <th>% Liên Vùng</th>
                                 <th>% Rớt LC</th>
                                 <th>OPR</th>
+                                <th>ODR</th>
+                                <th>% Longtail</th>
                                 <th>% 0 - 9h</th>
                                 <th>% 9h - 19h</th>
                                 <th>% Sau 19h</th>
@@ -279,12 +325,14 @@
                                     <th style="min-width: 180px;">Bưu Cục Lấy</th>
                                     <th style="min-width: 140px;">Quận/Huyện</th>
                                     <th style="text-align: center; width: 100px;">Quy Mô</th>
-                                    <th style="min-width: 580px;">Danh Sách Shop Đề Xuất (Sản Lượng & OPR)</th>
-                                    <th style="text-align: right; width: 180px;">Tổng Vol Gom/Ngày</th>
-                                    <th style="text-align: right; width: 180px;">Tổng Vol Gom/3 Tháng</th>
-                                    <th style="text-align: center; width: 120px;">% Rớt LC Nhóm</th>
-                                    <th style="text-align: center; width: 120px;">OPR TB Nhóm</th>
-                                    <th style="text-align: center; width: 160px;">Khả Thi</th>
+                                    <th style="min-width: 600px;">Danh Sách Shop Đề Xuất (Sản Lượng, OPR & SLA)</th>
+                                    <th style="text-align: right; width: 150px;">Tổng Vol Gom/Ngày</th>
+                                    <th style="text-align: right; width: 150px;">Tổng Vol Gom/3 Tháng</th>
+                                    <th style="text-align: center; width: 110px;">% Rớt LC Nhóm</th>
+                                    <th style="text-align: center; width: 110px;">OPR TB Nhóm</th>
+                                    <th style="text-align: center; width: 110px;">ODR Nhóm</th>
+                                    <th style="text-align: center; width: 110px;">Longtail Nhóm</th>
+                                    <th style="text-align: center; width: 150px;">Khả Thi</th>
                                 </tr>
                             </thead>
                             <tbody>

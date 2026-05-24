@@ -244,11 +244,151 @@ body {
     display: flex;
 }
 
-/* Scorecards */
-.scorecards {
+/* Scorecards & Metrics Grid */
+.metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.metrics-group {
+    background-color: rgba(30, 41, 59, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
+}
+
+.metrics-group h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+
+.metrics-group h4 i {
+    font-size: 1.1rem;
+    color: var(--accent-blue);
+}
+
+.scorecards-subgrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.scorecards-subgrid.col-2 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+/* Priority Grouping highlight */
+.metrics-group.priority-group {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(20, 184, 166, 0.05) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.05);
+}
+
+.metrics-group.priority-group h4 {
+    color: var(--accent-teal);
+}
+
+.metrics-group.priority-group h4 i {
+    color: var(--accent-teal);
+}
+
+.hot-badge {
+    background: linear-gradient(135deg, var(--accent-purple), var(--accent-teal));
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-left: auto;
+    text-transform: none;
+    letter-spacing: 0px;
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+}
+
+.priority-card {
+    border-color: rgba(20, 184, 166, 0.25) !important;
+}
+
+.priority-card:hover {
+    border-color: var(--accent-teal) !important;
+    box-shadow: 0 0 15px rgba(20, 184, 166, 0.2) !important;
+}
+
+.odr-icon {
+    background-color: rgba(20, 184, 166, 0.1) !important;
+    color: var(--accent-teal) !important;
+}
+
+.longtail-icon {
+    background-color: rgba(249, 115, 22, 0.1) !important;
+    color: var(--accent-orange) !important;
+}
+
+/* Interactive Chart Toggle */
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chart-toggle-group {
+    display: flex;
+    background-color: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    padding: 0.2rem;
+    border-radius: var(--border-radius-sm);
+    gap: 0.2rem;
+}
+
+.btn-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-toggle:hover {
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.btn-toggle.active {
+    color: white;
+    background-color: var(--accent-blue);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 1400px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .card {
