@@ -561,7 +561,7 @@ function renderTopShopsChart() {
             datasets: [{
                 label: 'Sản Lượng (Đơn/Ngày)',
                 data: data,
-                backgroundColor: sortedShops.map(s => ((s.pct_opr * 100) < 90 || (s.pct_rot_lc || 0) > 0.02) ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.8)'),
+                backgroundColor: sortedShops.map(s => (((s.pct_odr || 0) < 0.92 || (s.pct_longtail || 0) > 0.08) ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.8)')),
                 borderRadius: 4
             }]
         },
@@ -584,6 +584,8 @@ function renderTopShopsChart() {
                             const shop = sortedShops[context.dataIndex];
                             return [
                                 `Khối lượng TB: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
+                                `ODR: ${((shop.pct_odr || 0) * 100).toFixed(1)}%`,
+                                `Longtail: ${((shop.pct_longtail || 0) * 100).toFixed(1)}%`,
                                 `OPR: ${oprs[context.dataIndex].toFixed(1)}%`,
                                 `% Rớt LC: ${((shop.pct_rot_lc || 0) * 100).toFixed(1)}%`,
                                 `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
