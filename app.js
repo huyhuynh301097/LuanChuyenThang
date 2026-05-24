@@ -1085,10 +1085,22 @@ function renderHeatmaps() {
         const r = row.vung || 'Khác';
         const d = row.quan || 'Unknown';
         if (!regions[r]) regions[r] = {};
-        if (!regions[r][d]) regions[r][d] = { vol: 0, totalOprVol: 0, totalRotLcVol: 0 };
+        if (!regions[r][d]) {
+            regions[r][d] = { 
+                vol: 0, 
+                totalOprVol: 0, 
+                totalRotLcVol: 0,
+                totalOdrDelivered: 0,
+                totalLongtailDelivered: 0,
+                totalDeliveredVol: 0
+            };
+        }
         regions[r][d].vol += row.vol;
         regions[r][d].totalOprVol += (row.pct_opr * row.vol);
         regions[r][d].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
+        regions[r][d].totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
+        regions[r][d].totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
+        regions[r][d].totalDeliveredVol += (row.vol_delivered || 0);
     });
 
     Object.keys(regions).sort().forEach(r => {
@@ -1097,7 +1109,9 @@ function renderHeatmaps() {
             name,
             vol: data.vol,
             opr: data.vol > 0 ? (data.totalOprVol / data.vol) : 0,
-            rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0
+            rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0,
+            odr: data.totalDeliveredVol > 0 ? (data.totalOdrDelivered / data.totalDeliveredVol) : 0,
+            longtail: data.totalDeliveredVol > 0 ? (data.totalLongtailDelivered / data.totalDeliveredVol) : 0
         })).sort((a, b) => b.vol - a.vol); // Sort by volume descending
 
         if (districts.length === 0) return;
@@ -1106,33 +1120,48 @@ function renderHeatmaps() {
 
         let html = `<div><h4 style="margin-bottom: 0.5rem; color: var(--accent-blue);">${r}</h4>`;
         html += `<table class="heatmap-table">
-            <thead><tr><th>Quận/Huyện</th><th>Tổng Sản Lượng</th><th>% Rớt LC</th><th>OPR Trung Bình</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Quận/Huyện</th>
+                    <th style="text-align: right;">Sản Lượng</th>
+                    <th style="text-align: center;">Rớt LC</th>
+                    <th style="text-align: center;">OPR</th>
+                    <th style="text-align: center;">ODR</th>
+                    <th style="text-align: center;">Longtail</th>
+                </tr>
+            </thead>
             <tbody>`;
 
         districts.forEach(d => {
-            // Color for Volume: Light blue to Deep blue
+            // Volume: clean transparent blue overlay for high-contrast legibility
             const volIntensity = maxVol > 0 ? (d.vol / maxVol) : 0;
-            const volBg = `rgba(59, 130, 246, ${Math.max(0.1, volIntensity)})`;
+            const volBg = `rgba(59, 130, 246, ${Math.max(0.12, volIntensity * 0.5)})`;
             
-            // Color for OPR: Red (<90) to Green (>=90)
-            let oprBg = '';
-            if (d.opr < 0.85) oprBg = '#ef4444'; // Red
-            else if (d.opr < 0.90) oprBg = '#f97316'; // Orange
-            else if (d.opr < 0.95) oprBg = '#eab308'; // Yellow
-            else oprBg = '#22c55e'; // Green
+            // Unified simplified color styling: soft transparent green (healthy) vs soft transparent red (warning)
+            const redBg = 'rgba(239, 68, 68, 0.15)';
+            const greenBg = 'rgba(34, 197, 94, 0.1)';
+            const redText = '#fc8181';
+            const greenText = '#4ade80';
 
-            // Color for Rớt LC: Green (<=2) to Red (>10)
-            let rotLcBg = '';
-            if (d.rotLc <= 0.02) rotLcBg = '#22c55e';
-            else if (d.rotLc <= 0.05) rotLcBg = '#eab308';
-            else if (d.rotLc <= 0.10) rotLcBg = '#f97316';
-            else rotLcBg = '#ef4444';
+            const rotLcBg = d.rotLc > 0.02 ? redBg : greenBg;
+            const rotLcColor = d.rotLc > 0.02 ? redText : greenText;
+
+            const oprBg = d.opr < 0.9 ? redBg : greenBg;
+            const oprColor = d.opr < 0.9 ? redText : greenText;
+
+            const odrBg = d.odr < 0.92 ? redBg : greenBg;
+            const odrColor = d.odr < 0.92 ? redText : greenText;
+
+            const longtailBg = d.longtail > 0.08 ? redBg : greenBg;
+            const longtailColor = d.longtail > 0.08 ? redText : greenText;
 
             html += `<tr>
                 <td>${d.name}</td>
-                <td style="background-color: ${volBg};">${formatNumber(d.vol)}</td>
-                <td style="background-color: ${rotLcBg}; color: white; font-weight: bold;">${formatPercent(d.rotLc)}</td>
-                <td style="background-color: ${oprBg}; color: white; font-weight: bold;">${formatPercent(d.opr)}</td>
+                <td style="background-color: ${volBg}; text-align: right; font-weight: bold; color: white;">${formatNumber(d.vol)}</td>
+                <td style="background-color: ${rotLcBg}; color: ${rotLcColor}; font-weight: bold; text-align: center;">${formatPercent(d.rotLc)}</td>
+                <td style="background-color: ${oprBg}; color: ${oprColor}; font-weight: bold; text-align: center;">${formatPercent(d.opr)}</td>
+                <td style="background-color: ${odrBg}; color: ${odrColor}; font-weight: bold; text-align: center;">${formatPercent(d.odr)}</td>
+                <td style="background-color: ${longtailBg}; color: ${longtailColor}; font-weight: bold; text-align: center;">${formatPercent(d.longtail)}</td>
             </tr>`;
         });
 

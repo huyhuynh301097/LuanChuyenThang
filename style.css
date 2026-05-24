@@ -538,7 +538,7 @@ body {
     font-size: 0.9rem;
     border: 1px solid var(--border-color);
     font-weight: 500;
-    color: #111; /* dark text for better contrast on colored bg */
+    color: var(--text-main); /* Changed to white for premium dark mode contrast */
 }
 
 .heatmap-table td:first-child {
