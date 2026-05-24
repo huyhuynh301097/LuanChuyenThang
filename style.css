@@ -813,3 +813,33 @@ tbody tr.danger-row:hover {
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
 }
 
+/* Sticky Shop Name Column in Raw Data Table */
+#details-table th:nth-child(7) {
+    position: sticky;
+    left: 0;
+    z-index: 15; /* Keep it above other th headers during vertical/horizontal scroll */
+    background-color: #172135 !important; /* Solid dark color matching the table header */
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.4);
+}
+
+#details-table td:nth-child(7) {
+    position: sticky;
+    left: 0;
+    z-index: 5; /* Keep it above other td cells */
+    background-color: var(--bg-panel) !important; /* Solid background to mask underlying scrolling data */
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Maintain hover & custom row backgrounds for sticky cell */
+#details-table tr:hover td:nth-child(7) {
+    background-color: var(--bg-panel-hover) !important;
+}
+
+#details-table tr.danger-row td:nth-child(7) {
+    background-color: #272235 !important; /* Matches danger row tint blended with background */
+}
+
+#details-table tr.danger-row:hover td:nth-child(7) {
+    background-color: #382945 !important; /* Blends danger row hover tint with background */
+}
+
