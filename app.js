@@ -1127,7 +1127,7 @@ function renderHeatmaps() {
 }
 
 
-// Calculate combinations of 2 and 3 shops for each (quan, warehouse_name, flow, KTC) cluster
+// Calculate combinations of 2 and 3 shops for each (quan, warehouse_name, KTC) cluster
 function calculateShopGroups() {
     const shopsMap = {};
     
@@ -1160,6 +1160,7 @@ function calculateShopGroups() {
                 vol_tb_ngay_top_tinh_giao_count: 0,
                 top_tinh_giao: row.top_tinh_giao || 'Không rõ',
                 loai_kh: row.loai_kh || 'Chưa phân loại',
+                KTC: row.KTC || 'Không rõ',
                 
                 // SLA & OPR aggregations
                 opr_vol_sum: 0,
@@ -1207,12 +1208,6 @@ function calculateShopGroups() {
         const weightedRotLc = s.total_vol > 0 ? (s.rot_lc_vol_sum / s.total_vol) : 0;
         const weightedOdr = s.total_vol > 0 ? (s.odr_vol_sum / s.total_vol) : 0;
         const weightedLongtail = s.total_vol > 0 ? (s.longtail_vol_sum / s.total_vol) : 0;
-        
-        // Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if top province ratio > 30%
-        const flowType = (avgPctTopTinhGiao > 0.30) ? '2' : '1';
-        
-        // KTC destination is always top_tinh_giao
-        const ktcDest = s.top_tinh_giao || 'Không rõ';
 
         return {
             ten_kh: s.ten_kh,
@@ -1225,8 +1220,7 @@ function calculateShopGroups() {
             vol_tb_ngay_top_tinh_giao: avgVolTopTinhGiao,
             top_tinh_giao: s.top_tinh_giao,
             loai_kh: s.loai_kh,
-            flow_type: flowType,
-            KTC: ktcDest,
+            KTC: s.KTC || 'Không rõ',
             
             weighted_opr: weightedOpr,
             weighted_rot_lc: weightedRotLc,
@@ -1236,76 +1230,71 @@ function calculateShopGroups() {
         };
     });
 
-    const singleShopSuggestions = [];
-    const groupingCandidates = [];
-
-    // Separate shops into Direct Dispatch (Single Shop) or Grouping Candidates
-    shopsList.forEach(s => {
-        // Single shop goes alone if:
-        // - Luồng 2: top province weight kl_tb_ngay_top_tinh_giao >= 5000 kg (Xe 5T payload)
-        // - Luồng 1: total weight avg_kl_tb_ngay >= 1900 kg (Xe 1.9T payload)
-        const weightForRouting = s.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
-        const volForRouting = s.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
-        const singleThreshold = s.flow_type === '2' ? 5000 : 1900;
-        
-        if (weightForRouting >= singleThreshold) {
-            // Can go alone!
-            singleShopSuggestions.push({
-                is_single: true,
-                quan: s.quan,
-                warehouse_name: s.warehouse_name,
-                flow_type: s.flow_type,
-                KTC: s.KTC,
-                shops: [s],
-                combined_vol_tb_ngay: volForRouting,
-                combined_kl_tb_ngay: weightForRouting,
-                combined_vol: s.total_vol,
-                combined_opr: s.weighted_opr,
-                combined_rot_lc: s.weighted_rot_lc,
-                combined_odr: s.weighted_odr,
-                combined_longtail: s.weighted_longtail
-            });
-        } else {
-            groupingCandidates.push(s);
-        }
-    });
-
-    // 2. Grouping for Candidates (under 1000kg)
-    // Group candidates by: quan + warehouse_name + flow_type + KTC
+    // Group candidates by: quan + warehouse_name + KTC
     const clusters = {};
-    groupingCandidates.forEach(s => {
-        const clusterKey = `${s.quan} ||| ${s.warehouse_name} ||| ${s.flow_type} ||| ${s.KTC}`;
+    shopsList.forEach(s => {
+        const clusterKey = `${s.quan} ||| ${s.warehouse_name} ||| ${s.KTC}`;
         if (!clusters[clusterKey]) {
             clusters[clusterKey] = [];
         }
         clusters[clusterKey].push(s);
     });
 
-    const groupSuggestions = [];
+    const allProposals = [];
 
     Object.entries(clusters).forEach(([clusterKey, candidateShops]) => {
-        const [quan, whName, flowVal, ktcDest] = clusterKey.split(' ||| ');
+        const [quan, whName, ktcDest] = clusterKey.split(' ||| ');
 
-        if (candidateShops.length < 2) return;
-
-        // Sort candidateShops by routing weight descending
-        candidateShops.sort((a, b) => {
-            const weightA = a.flow_type === '2' ? a.kl_tb_ngay_top_tinh_giao : a.avg_kl_tb_ngay;
-            const weightB = b.flow_type === '2' ? b.kl_tb_ngay_top_tinh_giao : b.avg_kl_tb_ngay;
-            return weightB - weightA;
+        // 1. Size 1 (Single shop proposals)
+        candidateShops.forEach(s => {
+            // Check if s qualifies for Flow 2 single
+            const fitsFlow2 = s.pct_top_tinh_giao > 0.30 && s.kl_tb_ngay_top_tinh_giao >= 5000;
+            
+            if (fitsFlow2) {
+                allProposals.push({
+                    is_single: true,
+                    quan,
+                    warehouse_name: whName,
+                    flow_type: '2',
+                    KTC: ktcDest,
+                    shops: [s],
+                    combined_vol_tb_ngay: s.vol_tb_ngay_top_tinh_giao,
+                    combined_kl_tb_ngay: s.kl_tb_ngay_top_tinh_giao,
+                    combined_vol: s.total_vol,
+                    combined_opr: s.weighted_opr,
+                    combined_rot_lc: s.weighted_rot_lc,
+                    combined_odr: s.weighted_odr,
+                    combined_longtail: s.weighted_longtail
+                });
+            } else {
+                // Fallback to Flow 1 single
+                allProposals.push({
+                    is_single: true,
+                    quan,
+                    warehouse_name: whName,
+                    flow_type: '1',
+                    KTC: ktcDest,
+                    shops: [s],
+                    combined_vol_tb_ngay: s.avg_vol_tb_ngay,
+                    combined_kl_tb_ngay: s.avg_kl_tb_ngay,
+                    combined_vol: s.total_vol,
+                    combined_opr: s.weighted_opr,
+                    combined_rot_lc: s.weighted_rot_lc,
+                    combined_odr: s.weighted_odr,
+                    combined_longtail: s.weighted_longtail
+                });
+            }
         });
 
-        // Size 2 combinations
+        // 2. Size 2 Combinations
         for (let i = 0; i < candidateShops.length; i++) {
             for (let j = i + 1; j < candidateShops.length; j++) {
                 const s1 = candidateShops[i];
                 const s2 = candidateShops[j];
-                
-                const w1 = s1.flow_type === '2' ? s1.kl_tb_ngay_top_tinh_giao : s1.avg_kl_tb_ngay;
-                const w2 = s2.flow_type === '2' ? s2.kl_tb_ngay_top_tinh_giao : s2.avg_kl_tb_ngay;
-                
-                const v1 = s1.flow_type === '2' ? s1.vol_tb_ngay_top_tinh_giao : s1.avg_vol_tb_ngay;
-                const v2 = s2.flow_type === '2' ? s2.vol_tb_ngay_top_tinh_giao : s2.avg_vol_tb_ngay;
+
+                // Check Flow 2 criteria
+                const fitsFlow2 = s1.pct_top_tinh_giao > 0.30 && s2.pct_top_tinh_giao > 0.30 && 
+                                  (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao) >= 5000;
 
                 const combinedVol = s1.total_vol + s2.total_vol;
                 const combinedOpr = combinedVol > 0 ? ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol)) / combinedVol : 0;
@@ -1313,60 +1302,90 @@ function calculateShopGroups() {
                 const combinedOdr = combinedVol > 0 ? ((s1.weighted_odr * s1.total_vol) + (s2.weighted_odr * s2.total_vol)) / combinedVol : 0;
                 const combinedLongtail = combinedVol > 0 ? ((s1.weighted_longtail * s1.total_vol) + (s2.weighted_longtail * s2.total_vol)) / combinedVol : 0;
 
-                groupSuggestions.push({
-                    is_single: false,
-                    quan,
-                    warehouse_name: whName,
-                    flow_type: flowVal,
-                    KTC: ktcDest,
-                    shops: [s1, s2],
-                    combined_vol_tb_ngay: v1 + v2,
-                    combined_kl_tb_ngay: w1 + w2,
-                    combined_vol: combinedVol,
-                    combined_opr: combinedOpr,
-                    combined_rot_lc: combinedRotLc,
-                    combined_odr: combinedOdr,
-                    combined_longtail: combinedLongtail
-                });
+                if (fitsFlow2) {
+                    allProposals.push({
+                        is_single: false,
+                        quan,
+                        warehouse_name: whName,
+                        flow_type: '2',
+                        KTC: ktcDest,
+                        shops: [s1, s2],
+                        combined_vol_tb_ngay: s1.vol_tb_ngay_top_tinh_giao + s2.vol_tb_ngay_top_tinh_giao,
+                        combined_kl_tb_ngay: s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao,
+                        combined_vol: combinedVol,
+                        combined_opr: combinedOpr,
+                        combined_rot_lc: combinedRotLc,
+                        combined_odr: combinedOdr,
+                        combined_longtail: combinedLongtail
+                    });
+                } else {
+                    allProposals.push({
+                        is_single: false,
+                        quan,
+                        warehouse_name: whName,
+                        flow_type: '1',
+                        KTC: ktcDest,
+                        shops: [s1, s2],
+                        combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay,
+                        combined_kl_tb_ngay: s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay,
+                        combined_vol: combinedVol,
+                        combined_opr: combinedOpr,
+                        combined_rot_lc: combinedRotLc,
+                        combined_odr: combinedOdr,
+                        combined_longtail: combinedLongtail
+                    });
+                }
             }
         }
 
-        // Size 3 combinations
-        if (candidateShops.length >= 3) {
-            for (let i = 0; i < candidateShops.length; i++) {
-                for (let j = i + 1; j < candidateShops.length; j++) {
-                    for (let k = j + 1; k < candidateShops.length; k++) {
-                        const s1 = candidateShops[i];
-                        const s2 = candidateShops[j];
-                        const s3 = candidateShops[k];
-                        
-                        const w1 = s1.flow_type === '2' ? s1.kl_tb_ngay_top_tinh_giao : s1.avg_kl_tb_ngay;
-                        const w2 = s2.flow_type === '2' ? s2.kl_tb_ngay_top_tinh_giao : s2.avg_kl_tb_ngay;
-                        const w3 = s3.flow_type === '2' ? s3.kl_tb_ngay_top_tinh_giao : s3.avg_kl_tb_ngay;
-                        
-                        const v1 = s1.flow_type === '2' ? s1.vol_tb_ngay_top_tinh_giao : s1.avg_vol_tb_ngay;
-                        const v2 = s2.flow_type === '2' ? s2.vol_tb_ngay_top_tinh_giao : s2.avg_vol_tb_ngay;
-                        const v3 = s3.flow_type === '2' ? s3.vol_tb_ngay_top_tinh_giao : s3.avg_vol_tb_ngay;
+        // 3. Size 3 Combinations
+        for (let i = 0; i < candidateShops.length; i++) {
+            for (let j = i + 1; j < candidateShops.length; j++) {
+                for (let k = j + 1; k < candidateShops.length; k++) {
+                    const s1 = candidateShops[i];
+                    const s2 = candidateShops[j];
+                    const s3 = candidateShops[k];
 
-                        const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
-                        const combinedOpr = combinedVol > 0 ? 
-                            ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol) + (s3.weighted_opr * s3.total_vol)) / combinedVol : 0;
-                        const combinedRotLc = combinedVol > 0 ? 
-                            ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol) + (s3.weighted_rot_lc * s3.total_vol)) / combinedVol : 0;
-                        const combinedOdr = combinedVol > 0 ? 
-                            ((s1.weighted_odr * s1.total_vol) + (s2.weighted_odr * s2.total_vol) + (s3.weighted_odr * s3.total_vol)) / combinedVol : 0;
-                        const combinedLongtail = combinedVol > 0 ? 
-                            ((s1.weighted_longtail * s1.total_vol) + (s2.weighted_longtail * s2.total_vol) + (s3.weighted_longtail * s3.total_vol)) / combinedVol : 0;
+                    // Check Flow 2 criteria
+                    const fitsFlow2 = s1.pct_top_tinh_giao > 0.30 && s2.pct_top_tinh_giao > 0.30 && s3.pct_top_tinh_giao > 0.30 &&
+                                      (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao + s3.kl_tb_ngay_top_tinh_giao) >= 5000;
 
-                        groupSuggestions.push({
+                    const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
+                    const combinedOpr = combinedVol > 0 ? 
+                        ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol) + (s3.weighted_opr * s3.total_vol)) / combinedVol : 0;
+                    const combinedRotLc = combinedVol > 0 ? 
+                        ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol) + (s3.weighted_rot_lc * s3.total_vol)) / combinedVol : 0;
+                    const combinedOdr = combinedVol > 0 ? 
+                        ((s1.weighted_odr * s1.total_vol) + (s2.weighted_odr * s2.total_vol) + (s3.weighted_odr * s3.total_vol)) / combinedVol : 0;
+                    const combinedLongtail = combinedVol > 0 ? 
+                        ((s1.weighted_longtail * s1.total_vol) + (s2.weighted_longtail * s2.total_vol) + (s3.weighted_longtail * s3.total_vol)) / combinedVol : 0;
+
+                    if (fitsFlow2) {
+                        allProposals.push({
                             is_single: false,
                             quan,
                             warehouse_name: whName,
-                            flow_type: flowVal,
+                            flow_type: '2',
                             KTC: ktcDest,
                             shops: [s1, s2, s3],
-                            combined_vol_tb_ngay: v1 + v2 + v3,
-                            combined_kl_tb_ngay: w1 + w2 + w3,
+                            combined_vol_tb_ngay: s1.vol_tb_ngay_top_tinh_giao + s2.vol_tb_ngay_top_tinh_giao + s3.vol_tb_ngay_top_tinh_giao,
+                            combined_kl_tb_ngay: s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao + s3.kl_tb_ngay_top_tinh_giao,
+                            combined_vol: combinedVol,
+                            combined_opr: combinedOpr,
+                            combined_rot_lc: combinedRotLc,
+                            combined_odr: combinedOdr,
+                            combined_longtail: combinedLongtail
+                        });
+                    } else {
+                        allProposals.push({
+                            is_single: false,
+                            quan,
+                            warehouse_name: whName,
+                            flow_type: '1',
+                            KTC: ktcDest,
+                            shops: [s1, s2, s3],
+                            combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay + s3.avg_vol_tb_ngay,
+                            combined_kl_tb_ngay: s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay + s3.avg_kl_tb_ngay,
                             combined_vol: combinedVol,
                             combined_opr: combinedOpr,
                             combined_rot_lc: combinedRotLc,
@@ -1379,23 +1398,19 @@ function calculateShopGroups() {
         }
     });
 
-    // 3. Combine both direct single shops and group suggestions
-    const allRecommendations = [...singleShopSuggestions, ...groupSuggestions];
-
-    // Sort: prioritizes direct KTC đầu giao (Luồng 2) first, then Luồng 1.
-    // Within each flow, sort by weight descending!
-    allRecommendations.sort((a, b) => {
+    // Sort: prioritize Flow 2 first, then Flow 1. Within each flow, sort by weight descending!
+    allProposals.sort((a, b) => {
         if (a.flow_type !== b.flow_type) {
-            // '2' goes first (Direct to KTC), '1' goes second
+            // '2' goes first, '1' goes second
             return b.flow_type.localeCompare(a.flow_type);
         }
         return b.combined_kl_tb_ngay - a.combined_kl_tb_ngay;
     });
 
-    // 4. Greedy Selection: each shop appears in at most one suggestion
+    // Greedy Selection: each shop appears in at most one suggestion
     const usedShopKeys = new Set();
-    const uniqueRecs = allRecommendations.filter(rec => {
-        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${rec.flow_type}|${s.ten_kh}`);
+    const uniqueRecs = allProposals.filter(rec => {
+        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${s.ten_kh}`);
         if (keys.some(k => usedShopKeys.has(k))) return false;
         keys.forEach(k => usedShopKeys.add(k));
         return true;
@@ -1515,8 +1530,8 @@ function updateGroupingTab() {
             flowBadge = '<span class="badge badge-flow-1"><i class="bx bx-git-merge"></i> Luồng 1 (Qua Sort)</span>';
         }
 
-        // Render KTC destination hub (always list the top_tinh_giao for all shops in the group/single proposal)
-        const ktcList = Array.from(new Set(g.shops.map(s => s.top_tinh_giao || 'Không rõ'))).join(', ');
+        // Render KTC destination hub (always list the KTC code for all shops in the group/single proposal)
+        const ktcList = Array.from(new Set(g.shops.map(s => s.KTC || 'Không rõ'))).join(', ');
         let ktcText = `<span class="badge-ktc"><i class="bx bx-map-pin"></i> ${ktcList}</span>`;
 
         let shopListHtml = '<div style="display: flex; flex-direction: column; gap: 0.4rem; padding: 0.2rem 0;">';
@@ -1527,8 +1542,8 @@ function updateGroupingTab() {
             let shopLongtailColor = s.weighted_longtail > 0.08 ? '#f43f5e' : '#14b8a6';
             
             // Routing weight is top province weight for flow 2, else total weight
-            const shopWeight = s.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
-            const shopVol = s.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
+            const shopWeight = g.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
+            const shopVol = g.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
             
             shopListHtml += `
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(51, 65, 85, 0.4); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(51, 65, 85, 0.6); white-space: nowrap;">

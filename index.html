@@ -284,9 +284,9 @@
                             Hệ thống tự động phân tích dữ liệu thực tế để gợi ý phân phối và gán tải trọng xe thông minh theo đặc thù logistics Việt Nam:
                         </p>
                         <ul style="margin-left: 1.5rem; margin-top: 0.5rem; line-height: 1.6; color: var(--text-muted); font-size: 0.9rem;">
-                            <li><strong style="color: #60a5fa;">Luồng 1 (Gom qua KTC đầu lấy):</strong> Áp dụng cho các shop có sản lượng đi tỉnh nhỏ lẻ, phân tán (tỷ trọng về tỉnh giao lớn nhất ≤ 30%). Hệ thống gán <strong>Xe 1.9T (1900kg)</strong> hoặc <strong>Xe 2.5T (2500kg)</strong> làm xe trung chuyển tiêu chuẩn tránh giờ cấm tải đô thị.</li>
-                            <li><strong style="color: #4ade80;">Luồng 2 (Đi thẳng KTC đầu giao):</strong> Áp dụng cho các shop có sản lượng lớn đi về cùng một tỉnh (tỷ trọng về tỉnh đó > 30%). Hệ thống chỉ định xe trung & đại tải hiệu suất cao: <strong>Xe 5T (5000kg)</strong> hoặc <strong>Xe 8T (8000kg)</strong> để tối ưu chi phí luân chuyển trực tiếp giữa các vùng.</li>
-                            <li><strong style="color: #facc15;">Shop Đi Riêng (Xe Đơn):</strong> Bất kỳ shop nào có khối lượng trung bình ngày đi thẳng đủ lớn (<strong>≥ 5000 kg đối với Luồng 2</strong> và <strong>≥ 1900 kg đối với Luồng 1</strong>) sẽ được tự động xếp đi một xe tải riêng lẻ độc lập mà không cần gom nhóm.</li>
+                            <li><strong style="color: #4ade80;">Luồng 2 (Đi thẳng KTC đầu giao):</strong> Áp dụng cho các shop lẻ hoặc nhóm gom 2-3 shop đi cùng tỉnh giao đích (qua KTC) có tỷ lệ khối lượng đơn đến tỉnh đó <strong>> 30%</strong> VÀ đạt khối lượng tải trọng lớn <strong>≥ 5000 kg/ngày</strong> (Xe 5T hoặc Xe 8T) để đi thẳng tối ưu chi phí luân chuyển.</li>
+                            <li><strong style="color: #60a5fa;">Luồng 1 (Gom qua KTC đầu lấy):</strong> Áp dụng cho toàn bộ các trường hợp còn lại (không thỏa mãn điều kiện đi thẳng Luồng 2). Hệ thống tự động phân bổ đi Xe đơn lẻ hoặc Gom nhóm 2-3 shop đạt tải trọng <strong>≥ 1900 kg/ngày</strong> để gán <strong>Xe 1.9T (1900kg)</strong> hoặc <strong>Xe 2.5T (2500kg)</strong> làm xe trung chuyển tiêu chuẩn tránh giờ cấm tải đô thị.</li>
+                            <li><strong style="color: #facc15;">Mã KTC Đầu Giao Đích:</strong> Hiển thị trực tiếp mã kho trung chuyển đích thực tế từ cột KTC gốc của dữ liệu đối với cả hai luồng vận hành để phục vụ công tác điều độ điều xe chính xác.</li>
                         </ul>
                     </div>
                 </div>
