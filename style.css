@@ -843,3 +843,119 @@ tbody tr.danger-row:hover {
     background-color: #382945 !important; /* Blends danger row hover tint with background */
 }
 
+/* Custom Weight Slider Styling */
+#grouping-min-weight {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#grouping-min-weight::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#grouping-min-weight::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: #4ade80;
+}
+
+/* Flow Badge Styling */
+.badge-flow-1 {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(234, 179, 8, 0.15)) !important;
+    color: #fb923c !important;
+    border: 1px solid rgba(249, 115, 22, 0.3) !important;
+    font-weight: 600;
+}
+
+.badge-flow-2 {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(59, 130, 246, 0.2)) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(20, 184, 166, 0.4) !important;
+    font-weight: bold;
+    box-shadow: 0 0 12px rgba(20, 184, 166, 0.2);
+    animation: flowGlow 3s infinite alternate;
+}
+
+@keyframes flowGlow {
+    0% { box-shadow: 0 0 5px rgba(20, 184, 166, 0.1); }
+    100% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.3); }
+}
+
+.badge-ktc {
+    background-color: rgba(139, 92, 246, 0.15) !important;
+    color: #c084fc !important;
+    border: 1px solid rgba(139, 92, 246, 0.3) !important;
+    font-weight: 600;
+    font-family: monospace;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+/* Truck Capacity & Progress Visuals */
+.truck-capacity-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    min-width: 150px;
+}
+
+.truck-cap-progress {
+    width: 100%;
+    height: 6px;
+    background: rgba(51, 65, 85, 0.6);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.2rem 0;
+}
+
+.truck-cap-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease-in-out;
+}
+
+.truck-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: monospace;
+}
+
+.truck-meta i {
+    font-size: 0.9rem;
+    color: var(--accent-blue);
+}
+
+.truck-icon-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-blue);
+    font-size: 0.95rem;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+}
+
+

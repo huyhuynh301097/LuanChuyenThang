@@ -75,6 +75,26 @@
                     <div class="checkbox-list" id="filter-hub"></div>
                 </div>
 
+                <div class="filter-group">
+                    <label>Loại Khách Hàng</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm loại KH..." data-target="filter-client-type">
+                    <div class="checkbox-list" id="filter-client-type"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>KTC Đầu Giao Gợi Ý</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm KTC..." data-target="filter-ktc">
+                    <div class="checkbox-list" id="filter-ktc"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Luồng Vận Hành</label>
+                    <div class="checkbox-list" id="filter-flow">
+                        <label class="checkbox-item"><input type="checkbox" value="1"> <span>Luồng 1 (Gom đầu lấy)</span></label>
+                        <label class="checkbox-item"><input type="checkbox" value="2"> <span>Luồng 2 (Đi thẳng KTC)</span></label>
+                    </div>
+                </div>
+
                 <button id="reset-filters" class="btn-primary">
                     <i class='bx bx-refresh'></i> Đặt Lại Bộ Lọc
                 </button>
@@ -173,6 +193,29 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Group 4: Phân Luồng Vận Hành -->
+                <div class="metrics-group flow-group" style="background: linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border: 1px solid rgba(20, 184, 166, 0.3);">
+                    <h4><i class='bx bx-git-branch'></i> Luồng Vận Hành</h4>
+                    <div class="scorecards-subgrid col-2">
+                        <div class="card">
+                            <div class="card-icon flow2-icon" style="background-color: rgba(20, 184, 166, 0.1); color: var(--accent-teal);"><i class='bx bx-navigation'></i></div>
+                            <div class="card-info">
+                                <p>Đi Thẳng KTC (Luồng 2)</p>
+                                <h3 id="score-flow2-pct">0%</h3>
+                                <small style="color: var(--text-muted)" id="score-flow2-vol">0 đơn</small>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon flow1-icon" style="background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange);"><i class='bx bx-git-merge'></i></div>
+                            <div class="card-info">
+                                <p>Qua Sort Lấy (Luồng 1)</p>
+                                <h3 id="score-flow1-pct">0%</h3>
+                                <small style="color: var(--text-muted)" id="score-flow1-vol">0 đơn</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Alerts Section -->
@@ -236,12 +279,19 @@
                              <tr>
                                 <th>Tháng</th>
                                 <th>Vùng</th>
-                                <th>Tỉnh</th>
-                                <th>Quận</th>
+                                <th>Tỉnh Lấy</th>
+                                <th>Quận Lấy</th>
                                 <th>Mã BC Lấy</th>
                                 <th>Bưu Cục Lấy</th>
                                 <th>Tên Khách Hàng (Shop)</th>
+                                <th>Client ID</th>
+                                <th>Shop ID</th>
                                 <th>Mã Đơn Mẫu</th>
+                                <th>Loại KH</th>
+                                <th>KTC Đầu Giao Gợi Ý</th>
+                                <th>Tỉnh Giao Lớn Nhất</th>
+                                <th>% Tỉnh Giao Lớn Nhất</th>
+                                <th>Sản Lượng Tuyến Lớn Nhất</th>
                                 <th>Nhóm Sản Lượng</th>
                                 <th>Tổng Vol</th>
                                 <th>Đơn Giao TC</th>
@@ -272,12 +322,13 @@
 
             <div id="tab-grouping" class="tab-content">
                 <!-- Grouping Intro Card -->
-                <div class="grouping-intro-card">
-                    <i class='bx bx-bulb'></i>
+                <div class="grouping-intro-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(20, 184, 166, 0.05) 100%); border-left: 4px solid var(--accent-teal);">
+                    <i class='bx bx-bulb' style="color: var(--accent-teal);"></i>
                     <div>
-                        <h4>Giải Pháp Đề Xuất Gom Nhóm Luân Chuyển Thẳng</h4>
+                        <h4>Giải Pháp Đề Xuất Phân Luồng & Gom Nhóm Tối Ưu Xe Tải</h4>
                         <p>
-                            Nhằm hỗ trợ các bưu cục gom hàng tối ưu cho xe tải luân chuyển thẳng (khi các shop đơn lẻ chưa đạt 1.000 đơn/ngày). Hệ thống tự động phân tích dữ liệu thực tế và đề xuất các tổ hợp gồm <strong>2 - 3 shop</strong> nằm trong <strong>cùng một Quận/Huyện</strong> và cùng thuộc <strong>một Bưu cục lấy</strong>. Thứ tự đề xuất được ưu tiên theo tổng sản lượng gom trung bình ngày giảm dần.
+                            Hệ thống tự động phân tích dữ liệu thực tế để gợi ý phân phối theo 2 luồng vận hành chính: **Luồng 1 (Gom qua kho trung chuyển đầu lấy)** dành cho các shop có sản lượng đi tỉnh nhỏ lẻ, phân tán; **Luồng 2 (Đi thẳng KTC đầu giao)** dành cho các shop có sản lượng lớn đi chung một kho trung chuyển đầu giao (KTC).
+                            Đồng thời, hệ thống sẽ thực hiện ghép chéo các khách hàng trong **cùng Quận/Huyện** và **cùng thuộc Bưu cục lấy** để tối ưu hóa tải trọng của các xe tải: **Xe 1.9T (1900kg)**, **Xe 2.5T (2500kg)**, **Xe 5T (5000kg)** và **Xe 8T (8000kg)**.
                         </p>
                     </div>
                 </div>
@@ -286,28 +337,59 @@
                 <div class="grouping-controls-bar">
                     
                     <!-- Min Combined Volume Slider -->
-                    <div style="flex: 1; min-width: 250px;">
+                    <div style="flex: 1; min-width: 200px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Sản lượng nhóm tối thiểu/ngày:</label>
+                            <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Vol nhóm tối thiểu/ngày:</label>
                             <span id="grouping-vol-val" style="color: var(--accent-blue); font-weight: bold; font-family: monospace; font-size: 1rem;">300 đơn</span>
                         </div>
-                        <input type="range" id="grouping-min-vol" min="100" max="1000" step="50" value="300">
+                        <input type="range" id="grouping-min-vol" min="50" max="1500" step="50" value="300" style="width: 100%;">
+                    </div>
+
+                    <!-- Min Combined Weight Slider -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">KL nhóm tối thiểu/ngày (Kg):</label>
+                            <span id="grouping-weight-val" style="color: var(--accent-teal); font-weight: bold; font-family: monospace; font-size: 1rem;">100 kg</span>
+                        </div>
+                        <input type="range" id="grouping-min-weight" min="10" max="4000" step="10" value="100" style="width: 100%;">
                     </div>
 
                     <!-- Group Size Filter -->
-                    <div style="min-width: 180px;">
+                    <div style="min-width: 150px;">
                         <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Quy mô nhóm gom:</label>
-                        <select id="grouping-size" style="width: 100%; padding: 0.5rem;">
+                        <select id="grouping-size" style="width: 100%; padding: 0.5rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
                             <option value="all">Tất cả (2 hoặc 3 Shop)</option>
                             <option value="2">Gom 2 Shop</option>
                             <option value="3">Gom 3 Shop</option>
                         </select>
                     </div>
 
+                    <!-- Suggested Truck Filter -->
+                    <div style="min-width: 150px;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Loại xe tải đề xuất:</label>
+                        <select id="grouping-truck-type" style="width: 100%; padding: 0.5rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="all">Tất cả các xe</option>
+                            <option value="1.9T">Xe 1.9T (1900 Kg)</option>
+                            <option value="2.5T">Xe 2.5T (2500 Kg)</option>
+                            <option value="5T">Xe 5T (5000 Kg)</option>
+                            <option value="8T">Xe 8T (8000 Kg)</option>
+                        </select>
+                    </div>
+
+                    <!-- Suggested Flow Filter -->
+                    <div style="min-width: 150px;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Luồng vận hành đề xuất:</label>
+                        <select id="grouping-flow" style="width: 100%; padding: 0.5rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="all">Tất cả các luồng</option>
+                            <option value="1">Luồng 1 (Gom đầu lấy)</option>
+                            <option value="2">Luồng 2 (Đi thẳng KTC)</option>
+                        </select>
+                    </div>
+
                     <!-- Search Box for Grouping -->
-                    <div style="min-width: 220px; flex-grow: 0.5;">
-                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Tìm Bưu cục / Quận:</label>
-                        <input type="text" id="grouping-search" placeholder="Nhập tên bưu cục hoặc quận..." style="width: 100%; padding: 0.5rem 1rem;">
+                    <div style="min-width: 180px;">
+                        <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Tìm BC / Quận / KTC:</label>
+                        <input type="text" id="grouping-search" placeholder="Nhập từ khóa tìm..." style="width: 100%; padding: 0.5rem 1rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
                     </div>
 
                 </div>
@@ -315,24 +397,26 @@
                 <!-- Grouping Table Section -->
                 <section class="data-table-section">
                     <div class="table-header">
-                        <h3>Danh Sách Đề Xuất Gom Nhóm Tối Ưu (Xếp Hạng Sản Lượng)</h3>
+                        <h3>Danh Sách Đề Xuất Gom Nhóm Tối Ưu Xe Vận Tải</h3>
                     </div>
                     <div class="table-responsive">
                         <table id="grouping-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 70px; text-align: center;">Hạng</th>
-                                    <th style="min-width: 180px;">Bưu Cục Lấy</th>
-                                    <th style="min-width: 140px;">Quận/Huyện</th>
+                                    <th style="width: 60px; text-align: center;">Hạng</th>
+                                    <th style="min-width: 160px;">Bưu Cục Lấy</th>
+                                    <th style="min-width: 120px;">Quận/Huyện</th>
                                     <th style="text-align: center; width: 100px;">Quy Mô</th>
-                                    <th style="min-width: 600px;">Danh Sách Shop Đề Xuất (Sản Lượng, OPR & SLA)</th>
-                                    <th style="text-align: right; width: 150px;">Tổng Vol Gom/Ngày</th>
-                                    <th style="text-align: right; width: 150px;">Tổng Vol Gom/3 Tháng</th>
+                                    <th style="text-align: center; width: 100px;">Luồng Gợi Ý</th>
+                                    <th style="text-align: center; width: 100px;">KTC Đầu Giao</th>
+                                    <th style="min-width: 520px;">Danh Sách Shop Gom Nhóm (Sản Lượng, OPR & SLA, Trọng Lượng)</th>
+                                    <th style="text-align: right; width: 140px;">Tổng Vol Gom/Ngày</th>
+                                    <th style="text-align: right; width: 160px;">Hiệu Suất Xe Tải</th>
                                     <th style="text-align: center; width: 110px;">% Rớt LC Nhóm</th>
                                     <th style="text-align: center; width: 110px;">OPR TB Nhóm</th>
                                     <th style="text-align: center; width: 110px;">ODR Nhóm</th>
                                     <th style="text-align: center; width: 110px;">Longtail Nhóm</th>
-                                    <th style="text-align: center; width: 150px;">Khả Thi</th>
+                                    <th style="text-align: center; width: 130px;">Khả Thi</th>
                                 </tr>
                             </thead>
                             <tbody>

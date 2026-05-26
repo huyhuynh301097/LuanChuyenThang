@@ -3,6 +3,8 @@ let rawData = [];
 let filteredData = [];
 let charts = {};
 
+const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Yaf-aMKXxZIrkFCI9RgN6cMNJaaW1PZ0e8up4Dv8Yx8/export?format=csv&gid=623910036';
+
 // Filter State
 const filters = {
     month: new Set(),
@@ -11,7 +13,10 @@ const filters = {
     district: new Set(),
     volumeGroup: new Set(),
     hubType: new Set(),
-    hub: new Set()
+    hub: new Set(),
+    clientType: new Set(),
+    ktc: new Set(),
+    flow: new Set()
 };
 
 // Initialize Application
@@ -22,85 +27,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load and Parse CSV Data
 function loadData() {
-    Papa.parse('data.csv', {
+    console.log("Fetching live data from Google Sheets...");
+    Papa.parse(GOOGLE_SHEET_URL, {
         download: true,
         header: true,
         dynamicTyping: true,
         complete: function(results) {
-            console.log("=== GHN CSV Loading Debug ===");
-            console.log("1. Total raw lines parsed from CSV:", results.data ? results.data.length : 0);
-            if (results.errors && results.errors.length > 0) {
-                console.error("2. PapaParse encountered errors:", results.errors);
-            }
-            
-            // Process Data: Add custom volume group based on user logic
-            rawData = results.data.filter(row => {
-                return row.warehouse_id !== null && row.warehouse_id !== undefined;
-            }).map(row => {
-                const volTbNgay = row.vol_tb_ngay || 0;
-                let nhomSanLuong = '';
-                
-                if (volTbNgay < 100) {
-                    nhomSanLuong = '1. Duoi 100 don/ngay';
-                } else if (volTbNgay <= 300) {
-                    nhomSanLuong = '2. 100 - 300 don/ngay';
-                } else if (volTbNgay <= 500) {
-                    nhomSanLuong = '3. 300 - 500 don/ngay';
-                } else if (volTbNgay <= 1000) {
-                    nhomSanLuong = '4. 500 - 1000 don/ngay';
-                } else {
-                    nhomSanLuong = '5. Trên 1000 don/ngay';
-                }
-
-                const hubName = row.warehouse_name || '';
-                const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
-
-                // Map new schema fields to keep compatibility with existing code
-                const kl = row.kl !== undefined ? row.kl : (row['kl(kg)'] || 0);
-                const soNgay = row.so_ngay !== undefined ? row.so_ngay : (row.so_ngay_phat_sinh_don || 0);
-                const soNgay1000 = row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : (row.so_ngay_tren_1000_don || 0);
-                const klTbNgay = row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : (row['kl_tb_ngay(kg)'] || 0);
-                const pctDuoi5kg = row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : (row.pct_don_duoi_5kg || 0);
-                const pctNoiVung = row.pct_noi_vung !== undefined ? row.pct_noi_vung : (row.pct_don_noi_vung || 0);
-                const pctLienVung = row.pct_lien_vung !== undefined ? row.pct_don_lien_vung : (row.pct_don_lien_vung || 0);
-
-                return {
-                    ...row,
-                    nhom_san_luong: nhomSanLuong,
-                    hub_type: hubType,
-                    // Handled properties
-                    vol: row.vol || 0,
-                    'kl(kg)': kl,
-                    so_ngay_phat_sinh_don: soNgay,
-                    so_ngay_tren_1000_don: soNgay1000,
-                    'kl_tb_ngay(kg)': klTbNgay,
-                    pct_don_duoi_5kg: pctDuoi5kg,
-                    pct_don_noi_vung: pctNoiVung,
-                    pct_don_lien_vung: pctLienVung,
-                    pct_opr: row.pct_opr || 0,
-                    pct_rot_lc: row.pct_rot_lc || 0,
-                    // New indicators
-                    vol_delivered: row.vol_delivered || 0,
-                    pct_odr: row.pct_odr || 0,
-                    pct_longtail: row.pct_longtail || 0
-                };
-            });
-
-            console.log("3. Total rawData rows mapped successfully:", rawData.length);
-            if (rawData.length > 0) {
-                console.log("4. Sample row data:", rawData[0]);
-            }
-
-            filteredData = [...rawData];
-            
-            initializeFilters();
-            updateDashboard();
+            console.log("Loaded data from Google Sheets successfully.");
+            processLoadedData(results.data);
         },
         error: function(err) {
-            console.error("Error loading CSV:", err);
-            alert("Không thể tải dữ liệu. Vui lòng kiểm tra file data.csv");
+            console.warn("Could not load from Google Sheets URL. Falling back to local data.csv.", err);
+            Papa.parse('data.csv', {
+                download: true,
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    console.log("Loaded data from local data.csv successfully.");
+                    processLoadedData(results.data);
+                },
+                error: function(localErr) {
+                    console.error("Local data fallback failed:", localErr);
+                    alert("Không thể tải dữ liệu từ Google Sheets hoặc local data.csv.");
+                }
+            });
         }
     });
+}
+
+function processLoadedData(parsedRows) {
+    console.log("=== GHN CSV Loading Debug ===");
+    console.log("Total raw lines parsed:", parsedRows ? parsedRows.length : 0);
+    
+    rawData = parsedRows.filter(row => {
+        return row.warehouse_id !== null && row.warehouse_id !== undefined;
+    }).map(row => {
+        const volTbNgay = row.vol_tb_ngay || 0;
+        let nhomSanLuong = '';
+        
+        if (volTbNgay < 100) {
+            nhomSanLuong = '1. Duoi 100 don/ngay';
+        } else if (volTbNgay <= 300) {
+            nhomSanLuong = '2. 100 - 300 don/ngay';
+        } else if (volTbNgay <= 500) {
+            nhomSanLuong = '3. 300 - 500 don/ngay';
+        } else if (volTbNgay <= 1000) {
+            nhomSanLuong = '4. 500 - 1000 don/ngay';
+        } else {
+            nhomSanLuong = '5. Trên 1000 don/ngay';
+        }
+
+        const hubName = row.warehouse_name || '';
+        const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
+
+        // Routing Flow Categorization
+        // Shop belongs to Flow 2 if it has a suggested KTC and high concentration (pct_top_tinh_giao >= 0.10)
+        // Otherwise, it goes to Flow 1
+        const hasKtc = row.KTC && String(row.KTC).trim() !== "" && String(row.KTC).toLowerCase() !== "nan" && String(row.KTC).toLowerCase() !== "null";
+        const flowType = (hasKtc && (row.pct_top_tinh_giao || 0) > 0.50) ? '2' : '1';
+
+        // Compatibility mapping
+        const kl = row.kl !== undefined ? row.kl : (row['kl(kg)'] || 0);
+        const soNgay = row.so_ngay !== undefined ? row.so_ngay : (row.so_ngay_phat_sinh_don || 0);
+        const soNgay1000 = row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : (row.so_ngay_tren_1000_don || 0);
+        const klTbNgay = row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : (row['kl_tb_ngay(kg)'] || 0);
+        const pctDuoi5kg = row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : (row.pct_don_duoi_5kg || 0);
+        const pctNoiVung = row.pct_noi_vung !== undefined ? row.pct_noi_vung : (row.pct_don_noi_vung || 0);
+        const pctLienVung = row.pct_lien_vung !== undefined ? row.pct_don_lien_vung : (row.pct_don_lien_vung || 0);
+
+        return {
+            ...row,
+            nhom_san_luong: nhomSanLuong,
+            hub_type: hubType,
+            flow_type: flowType,
+            vol: row.vol || 0,
+            'kl(kg)': kl,
+            so_ngay_phat_sinh_don: soNgay,
+            so_ngay_tren_1000_don: soNgay1000,
+            'kl_tb_ngay(kg)': klTbNgay,
+            pct_don_duoi_5kg: pctDuoi5kg,
+            pct_don_noi_vung: pctNoiVung,
+            pct_don_lien_vung: pctLienVung,
+            pct_opr: row.pct_opr || 0,
+            pct_rot_lc: row.pct_rot_lc || 0,
+            vol_delivered: row.vol_delivered || 0,
+            pct_odr: row.pct_odr || 0,
+            pct_longtail: row.pct_longtail || 0,
+            KTC: hasKtc ? String(row.KTC).trim() : 'Không rõ',
+            top_tinh_giao: row.top_tinh_giao || 'Không rõ',
+            pct_top_tinh_giao: row.pct_top_tinh_giao || 0,
+            vol_tb_ngay_top_tinh_giao: row.vol_tb_ngay_top_tinh_giao || 0,
+            loai_kh: row.loai_kh || 'Chưa phân loại'
+        };
+    });
+
+    console.log("Total rawData rows mapped successfully:", rawData.length);
+    filteredData = [...rawData];
+    
+    initializeFilters();
+    updateDashboard();
 }
 
 function initializeFilters() {
@@ -110,6 +135,8 @@ function initializeFilters() {
     populateCheckboxes('filter-district', [...new Set(rawData.map(d => d.quan).filter(Boolean))].sort());
     populateCheckboxes('filter-hub-type', ['KHL', 'Bưu Cục']);
     populateCheckboxes('filter-hub', [...new Set(rawData.map(d => d.warehouse_name).filter(Boolean))].sort());
+    populateCheckboxes('filter-client-type', [...new Set(rawData.map(d => d.loai_kh).filter(Boolean))].sort());
+    populateCheckboxes('filter-ktc', [...new Set(rawData.map(d => d.KTC).filter(d => d && d !== 'Không rõ'))].sort());
 }
 
 function populateCheckboxes(elementId, options) {
@@ -141,7 +168,10 @@ function setupEventListeners() {
         { id: 'filter-district', prop: 'district' },
         { id: 'filter-volume', prop: 'volumeGroup' },
         { id: 'filter-hub-type', prop: 'hubType' },
-        { id: 'filter-hub', prop: 'hub' }
+        { id: 'filter-hub', prop: 'hub' },
+        { id: 'filter-client-type', prop: 'clientType' },
+        { id: 'filter-ktc', prop: 'ktc' },
+        { id: 'filter-flow', prop: 'flow' }
     ];
 
     selectIds.forEach(({ id, prop }) => {
@@ -171,8 +201,20 @@ function setupEventListeners() {
             const label = document.getElementById('grouping-vol-val');
             if (label) label.textContent = '300 đơn';
         }
+        const groupWeightSlider = document.getElementById('grouping-min-weight');
+        if (groupWeightSlider) {
+            groupWeightSlider.value = 100;
+            const weightLabel = document.getElementById('grouping-weight-val');
+            if (weightLabel) weightLabel.textContent = '100 kg';
+        }
         const groupSizeSelect = document.getElementById('grouping-size');
         if (groupSizeSelect) groupSizeSelect.value = 'all';
+
+        const groupTruckSelect = document.getElementById('grouping-truck-type');
+        if (groupTruckSelect) groupTruckSelect.value = 'all';
+
+        const groupFlowSelect = document.getElementById('grouping-flow');
+        if (groupFlowSelect) groupFlowSelect.value = 'all';
         
         const groupSearchInput = document.getElementById('grouping-search');
         if (groupSearchInput) groupSearchInput.value = '';
@@ -228,7 +270,18 @@ function setupEventListeners() {
         });
     }
 
+    const groupWeightSlider = document.getElementById('grouping-min-weight');
+    if (groupWeightSlider) {
+        groupWeightSlider.addEventListener('input', (e) => {
+            const label = document.getElementById('grouping-weight-val');
+            if (label) label.textContent = `${e.target.value} kg`;
+            updateGroupingTab();
+        });
+    }
+
     document.getElementById('grouping-size')?.addEventListener('change', updateGroupingTab);
+    document.getElementById('grouping-truck-type')?.addEventListener('change', updateGroupingTab);
+    document.getElementById('grouping-flow')?.addEventListener('change', updateGroupingTab);
     document.getElementById('grouping-search')?.addEventListener('input', updateGroupingTab);
 
     // Tab Navigation
@@ -253,8 +306,14 @@ function applyFilters() {
         const matchVolume = filters.volumeGroup.size === 0 || filters.volumeGroup.has(row.nhom_san_luong);
         const matchHubType = filters.hubType.size === 0 || filters.hubType.has(row.hub_type);
         const matchHub = filters.hub.size === 0 || filters.hub.has(row.warehouse_name);
+        
+        // New filters
+        const matchClient = filters.clientType.size === 0 || filters.clientType.has(row.loai_kh);
+        const matchKtc = filters.ktc.size === 0 || filters.ktc.has(row.KTC);
+        const matchFlow = filters.flow.size === 0 || filters.flow.has(row.flow_type);
 
-        return matchMonth && matchRegion && matchProvince && matchDistrict && matchVolume && matchHubType && matchHub;
+        return matchMonth && matchRegion && matchProvince && matchDistrict && matchVolume && 
+               matchHubType && matchHub && matchClient && matchKtc && matchFlow;
     });
 
     updateDashboard();
@@ -326,6 +385,29 @@ function updateScorecards() {
 
     const elLongtail = document.getElementById('score-longtail');
     if (elLongtail) elLongtail.textContent = formatPercent(avgLongtail);
+
+    // Flow 1 vs Flow 2 metrics
+    let flow2Vol = 0;
+    let flow1Vol = 0;
+    filteredData.forEach(row => {
+        if (row.flow_type === '2') {
+            flow2Vol += row.vol;
+        } else {
+            flow1Vol += row.vol;
+        }
+    });
+    const flow2Pct = totalVol > 0 ? (flow2Vol / totalVol) : 0;
+    const flow1Pct = totalVol > 0 ? (flow1Vol / totalVol) : 0;
+
+    const elFlow2Pct = document.getElementById('score-flow2-pct');
+    if (elFlow2Pct) elFlow2Pct.textContent = formatPercent(flow2Pct);
+    const elFlow2Vol = document.getElementById('score-flow2-vol');
+    if (elFlow2Vol) elFlow2Vol.textContent = formatNumber(flow2Vol) + ' đơn';
+
+    const elFlow1Pct = document.getElementById('score-flow1-pct');
+    if (elFlow1Pct) elFlow1Pct.textContent = formatPercent(flow1Pct);
+    const elFlow1Vol = document.getElementById('score-flow1-vol');
+    if (elFlow1Vol) elFlow1Vol.textContent = formatNumber(flow1Vol) + ' đơn';
 }
 
 // Chart Configurations
@@ -925,7 +1007,14 @@ function updateTable() {
             <td>${row.warehouse_id || '-'}</td>
             <td><strong>${row.warehouse_name || '-'}</strong></td>
             <td style="color: var(--accent-blue); font-weight: bold;">${row.ten_kh || '-'}</td>
+            <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.client_id || '-'}</td>
+            <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.shop_id || '-'}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
+            <td><span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa;">${row.loai_kh || '-'}</span></td>
+            <td><span class="badge badge-ktc">${row.KTC || '-'}</span></td>
+            <td style="font-weight: 600; color: var(--text-main);">${row.top_tinh_giao || '-'}</td>
+            <td style="font-weight: 600; color: var(--accent-teal);">${formatPercent(row.pct_top_tinh_giao || 0)}</td>
+            <td style="font-weight: 600; color: var(--accent-blue);">${formatNumber(row.vol_tb_ngay_top_tinh_giao || 0)}</td>
             <td><span class="badge ${badgeClass}">${row.nhom_san_luong}</span></td>
             <td style="background-color: ${volBg}; font-weight: bold;">${formatNumber(row.vol)}</td>
             <td style="font-weight: bold; color: var(--text-main);">${formatNumber(row.vol_delivered || 0)}</td>
@@ -949,7 +1038,7 @@ function updateTable() {
     });
 
     if (tableData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="26" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="33" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
     }
 }
 
@@ -1173,7 +1262,7 @@ function renderHeatmaps() {
 }
 
 
-// Calculate combinations of 2 and 3 shops for each (quan, warehouse_name) cluster
+// Calculate combinations of 2 and 3 shops for each (quan, warehouse_name, flow, KTC) cluster
 function calculateShopGroups() {
     const clusters = {};
 
@@ -1181,10 +1270,16 @@ function calculateShopGroups() {
         const quan = row.quan;
         const whName = row.warehouse_name;
         const shop = row.ten_kh;
-        
+        const flow = row.flow_type; // '1' or '2'
+        const ktcDest = row.KTC || 'Không rõ';
+
         if (!quan || !whName || !shop) return;
 
-        const clusterKey = `${quan} ||| ${whName}`;
+        // Grouping key includes flow type and KTC destination
+        const clusterKey = flow === '2' 
+            ? `${quan} ||| ${whName} ||| Flow2 ||| ${ktcDest}`
+            : `${quan} ||| ${whName} ||| Flow1 ||| Origin`;
+
         if (!clusters[clusterKey]) {
             clusters[clusterKey] = {};
         }
@@ -1200,7 +1295,10 @@ function calculateShopGroups() {
                 odr_vol_sum: 0,
                 longtail_vol_sum: 0,
                 delivered_vol_sum: 0,
-                kl: 0
+                kl: 0,
+                kl_tb_ngay_sum: 0,
+                kl_tb_ngay_count: 0,
+                loai_kh: row.loai_kh
             };
         }
 
@@ -1214,15 +1312,19 @@ function calculateShopGroups() {
         s.longtail_vol_sum += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
         s.delivered_vol_sum += (row.vol_delivered || 0);
         s.kl += row['kl(kg)'] || 0;
+        s.kl_tb_ngay_sum += row['kl_tb_ngay(kg)'] || 0;
+        s.kl_tb_ngay_count++;
     });
 
     const recommendations = [];
 
     Object.entries(clusters).forEach(([clusterKey, shopsMap]) => {
-        const [quan, whName] = clusterKey.split(' ||| ');
-        
+        const [quan, whName, flowText, ktcDest] = clusterKey.split(' ||| ');
+        const flowVal = flowText === 'Flow2' ? '2' : '1';
+
         const candidateShops = Object.values(shopsMap).map(s => {
             const avgVolTbNgay = s.vol_tb_ngay_count > 0 ? (s.vol_tb_ngay_sum / s.vol_tb_ngay_count) : 0;
+            const avgKlTbNgay = s.kl_tb_ngay_count > 0 ? (s.kl_tb_ngay_sum / s.kl_tb_ngay_count) : 0;
             const weightedOpr = s.vol > 0 ? (s.opr_vol_sum / s.vol) : 0;
             const weightedRotLc = s.vol > 0 ? (s.rot_lc_vol_sum / s.vol) : 0;
             const weightedOdr = s.delivered_vol_sum > 0 ? (s.odr_vol_sum / s.delivered_vol_sum) : 0;
@@ -1230,13 +1332,15 @@ function calculateShopGroups() {
             return {
                 ten_kh: s.ten_kh,
                 avg_vol_tb_ngay: avgVolTbNgay,
+                avg_kl_tb_ngay: avgKlTbNgay,
                 weighted_opr: weightedOpr,
                 weighted_rot_lc: weightedRotLc,
                 weighted_odr: weightedOdr,
                 weighted_longtail: weightedLongtail,
                 total_vol: s.vol,
                 total_delivered_vol: s.delivered_vol_sum,
-                total_weight: s.kl
+                total_weight: s.kl,
+                loai_kh: s.loai_kh
             };
         })
         .filter(s => s.avg_vol_tb_ngay < 1000 && s.total_vol > 0)
@@ -1257,12 +1361,16 @@ function calculateShopGroups() {
                 const combinedRotLc = combinedVol > 0 ? ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol)) / combinedVol : 0;
                 const combinedOdr = combinedDelivered > 0 ? ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol)) / combinedDelivered : 0;
                 const combinedLongtail = combinedDelivered > 0 ? ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol)) / combinedDelivered : 0;
-                
+                const combinedKlTbNgay = s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay;
+
                 recommendations.push({
                     quan,
                     warehouse_name: whName,
+                    flow_type: flowVal,
+                    KTC: ktcDest,
                     shops: [s1, s2],
                     combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay,
+                    combined_kl_tb_ngay: combinedKlTbNgay,
                     combined_vol: combinedVol,
                     combined_delivered_vol: combinedDelivered,
                     combined_opr: combinedOpr,
@@ -1292,12 +1400,16 @@ function calculateShopGroups() {
                             ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol) + (s3.weighted_odr * s3.total_delivered_vol)) / combinedDelivered : 0;
                         const combinedLongtail = combinedDelivered > 0 ? 
                             ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol) + (s3.weighted_longtail * s3.total_delivered_vol)) / combinedDelivered : 0;
-                        
+                        const combinedKlTbNgay = s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay + s3.avg_kl_tb_ngay;
+
                         recommendations.push({
                             quan,
                             warehouse_name: whName,
+                            flow_type: flowVal,
+                            KTC: ktcDest,
                             shops: [s1, s2, s3],
                             combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay + s3.avg_vol_tb_ngay,
+                            combined_kl_tb_ngay: combinedKlTbNgay,
                             combined_vol: combinedVol,
                             combined_delivered_vol: combinedDelivered,
                             combined_opr: combinedOpr,
@@ -1316,7 +1428,7 @@ function calculateShopGroups() {
     // Greedy: each shop appears in AT MOST ONE group
     const usedShopKeys = new Set();
     const uniqueRecs = recommendations.filter(rec => {
-        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${s.ten_kh}`);
+        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${rec.flow_type}|${rec.KTC}|${s.ten_kh}`);
         if (keys.some(k => usedShopKeys.has(k))) return false;
         keys.forEach(k => usedShopKeys.add(k));
         return true;
@@ -1334,24 +1446,50 @@ function updateGroupingTab() {
     const groups = calculateShopGroups();
 
     const minVol = parseInt(document.getElementById('grouping-min-vol')?.value || 300, 10);
+    const minWeight = parseInt(document.getElementById('grouping-min-weight')?.value || 100, 10);
     const groupSize = document.getElementById('grouping-size')?.value || 'all';
+    const groupTruck = document.getElementById('grouping-truck-type')?.value || 'all';
+    const groupFlow = document.getElementById('grouping-flow')?.value || 'all';
     const searchQuery = (document.getElementById('grouping-search')?.value || '').trim().toLowerCase();
 
     let filteredGroups = groups.filter(g => {
         if (g.combined_vol_tb_ngay < minVol) return false;
+        if (g.combined_kl_tb_ngay < minWeight) return false;
         if (groupSize === '2' && g.shops.length !== 2) return false;
         if (groupSize === '3' && g.shops.length !== 3) return false;
+        if (groupFlow !== 'all' && g.flow_type !== groupFlow) return false;
+
+        // Determine truck match
+        let truckSize = 'Xe 1.9T';
+        let truckWeightLimit = 1900;
+        const w = g.combined_kl_tb_ngay;
+        if (w >= 8000) {
+            truckSize = 'Xe 8T';
+            truckWeightLimit = 8000;
+        } else if (w >= 5000) {
+            truckSize = 'Xe 5T';
+            truckWeightLimit = 5000;
+        } else if (w >= 2500) {
+            truckSize = 'Xe 2.5T';
+            truckWeightLimit = 2500;
+        } else {
+            truckSize = 'Xe 1.9T';
+            truckWeightLimit = 1900;
+        }
+
+        if (groupTruck !== 'all' && truckSize !== `Xe ${groupTruck}`) return false;
 
         if (searchQuery) {
             const matchHub = g.warehouse_name.toLowerCase().includes(searchQuery);
             const matchQuan = g.quan.toLowerCase().includes(searchQuery);
-            if (!matchHub && !matchQuan) return false;
+            const matchKtc = g.KTC.toLowerCase().includes(searchQuery);
+            if (!matchHub && !matchQuan && !matchKtc) return false;
         }
         return true;
     });
 
     if (filteredGroups.length === 0) {
-        table.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
+        table.innerHTML = '<tr><td colspan="14" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
         return;
     }
 
@@ -1395,6 +1533,19 @@ function updateGroupingTab() {
             statusBadge = '<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);">Cần Nuôi Thêm</span>';
         }
 
+        // Render Routing Flow Badge
+        let flowBadge = '';
+        if (g.flow_type === '2') {
+            flowBadge = '<span class="badge badge-flow-2"><i class="bx bx-navigation"></i> Luồng 2 (Đi thẳng)</span>';
+        } else {
+            flowBadge = '<span class="badge badge-flow-1"><i class="bx bx-git-merge"></i> Luồng 1 (Qua Sort)</span>';
+        }
+
+        // Render KTC destination hub
+        let ktcText = g.flow_type === '2' 
+            ? `<span class="badge-ktc"><i class="bx bx-map-pin"></i> ${g.KTC}</span>` 
+            : `<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">N/A (Sơ cấp)</span>`;
+
         let shopListHtml = '<div style="display: flex; flex-direction: column; gap: 0.4rem; padding: 0.2rem 0;">';
         g.shops.forEach(s => {
             let shopOprColor = s.weighted_opr < 0.9 ? '#f43f5e' : '#14b8a6';
@@ -1403,7 +1554,10 @@ function updateGroupingTab() {
             let shopLongtailColor = s.weighted_longtail > 0.08 ? '#f43f5e' : '#14b8a6';
             shopListHtml += `
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(51, 65, 85, 0.4); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(51, 65, 85, 0.6); white-space: nowrap;">
-                    <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; text-align: left;" title="${s.ten_kh}">${s.ten_kh}</span>
+                    <div style="display: flex; flex-direction: column; text-align: left; gap: 0.1rem; flex-grow: 1; min-width: 0;">
+                        <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${s.ten_kh}">${s.ten_kh}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Loại: ${s.loai_kh} | KL: ${s.avg_kl_tb_ngay.toFixed(1)} Kg/n</span>
+                    </div>
                     <div style="display: flex; gap: 0.3rem; flex-shrink: 0; align-items: center;">
                         <span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">${formatNumber(s.avg_vol_tb_ngay)} đơn</span>
                         <span class="badge" style="background-color: rgba(239, 68, 68, 0.15); color: ${shopRotLcColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">Rớt: ${formatPercent(s.weighted_rot_lc)}</span>
@@ -1415,6 +1569,45 @@ function updateGroupingTab() {
             `;
         });
         shopListHtml += '</div>';
+
+        // Calculate Truck Optimization Visuals
+        let truckSize = 'Xe 1.9T';
+        let truckWeightLimit = 1900;
+        const w = g.combined_kl_tb_ngay;
+        if (w >= 8000) {
+            truckSize = 'Xe 8T';
+            truckWeightLimit = 8000;
+        } else if (w >= 5000) {
+            truckSize = 'Xe 5T';
+            truckWeightLimit = 5000;
+        } else if (w >= 2500) {
+            truckSize = 'Xe 2.5T';
+            truckWeightLimit = 2500;
+        } else {
+            truckSize = 'Xe 1.9T';
+            truckWeightLimit = 1900;
+        }
+
+        const utilizationPct = Math.min(100, (w / truckWeightLimit) * 100);
+        
+        let progressBarColor = '#f97316'; // orange (low utilization)
+        if (utilizationPct >= 80) progressBarColor = '#22c55e'; // green (excellent)
+        else if (utilizationPct >= 50) progressBarColor = '#3b82f6'; // blue (good)
+        else if (utilizationPct >= 30) progressBarColor = '#eab308'; // yellow (average)
+
+        const truckIconHtml = `<span class="truck-icon-inline"><i class="bx bxs-truck"></i></span>`;
+
+        const truckCapacityHtml = `
+            <div class="truck-capacity-wrapper">
+                <span class="truck-meta">${truckIconHtml} <strong>${truckSize}</strong></span>
+                <div class="truck-cap-progress">
+                    <div class="truck-cap-bar" style="width: ${utilizationPct}%; background: ${progressBarColor};"></div>
+                </div>
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; font-family: monospace;">
+                    ${w.toFixed(1)} Kg / ${truckWeightLimit} Kg (${utilizationPct.toFixed(1)}%)
+                </span>
+            </div>
+        `;
 
         const progressPct = Math.min(100, (g.combined_vol_tb_ngay / 1000) * 100);
         const barColor = g.combined_vol_tb_ngay >= 1000 ? 'var(--accent-teal)' : 'var(--accent-blue)';
@@ -1432,9 +1625,11 @@ function updateGroupingTab() {
             <td style="font-weight: 700; color: white;">${g.warehouse_name}</td>
             <td style="color: var(--text-muted); font-weight: 500;">${g.quan}</td>
             <td style="text-align: center;"><span class="badge" style="background-color: ${g.shops.length === 3 ? 'rgba(139, 92, 246, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; color: ${g.shops.length === 3 ? '#a78bfa' : '#38bdf8'}; font-weight: bold;">Gom ${g.shops.length} Shop</span></td>
+            <td style="text-align: center; vertical-align: middle;">${flowBadge}</td>
+            <td style="text-align: center; vertical-align: middle;">${ktcText}</td>
             <td>${shopListHtml}</td>
             <td style="text-align: right; vertical-align: middle;">${volProgressHtml}</td>
-            <td style="text-align: right; vertical-align: middle; font-weight: bold; color: var(--text-main); font-family: monospace; font-size: 0.9rem;">${formatNumber(g.combined_vol)} đơn</td>
+            <td style="text-align: right; vertical-align: middle;">${truckCapacityHtml}</td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${rotLcBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_rot_lc)}</span></td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${oprBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_opr)}</span></td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${odrBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_odr)}</span></td>
