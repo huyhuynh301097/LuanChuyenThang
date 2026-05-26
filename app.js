@@ -1513,10 +1513,9 @@ function updateGroupingTab() {
             flowBadge = '<span class="badge badge-flow-1"><i class="bx bx-git-merge"></i> Luồng 1 (Qua Sort)</span>';
         }
 
-        // Render KTC destination hub
-        let ktcText = g.flow_type === '2' 
-            ? `<span class="badge-ktc"><i class="bx bx-map-pin"></i> ${g.KTC}</span>` 
-            : `<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">N/A (Sơ cấp)</span>`;
+        // Render KTC destination hub (always list the top_tinh_giao for all shops in the group/single proposal)
+        const ktcList = Array.from(new Set(g.shops.map(s => s.top_tinh_giao || 'Không rõ'))).join(', ');
+        let ktcText = `<span class="badge-ktc"><i class="bx bx-map-pin"></i> ${ktcList}</span>`;
 
         let shopListHtml = '<div style="display: flex; flex-direction: column; gap: 0.4rem; padding: 0.2rem 0;">';
         g.shops.forEach(s => {
@@ -1613,7 +1612,7 @@ function updateGroupingTab() {
         `;
 
         const scaleBadge = g.is_single
-            ? `<span class="badge" style="background-color: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: bold;">Đi Thẳng Lẻ</span>`
+            ? `<span class="badge" style="background-color: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: bold;">Xe Đơn (1 Shop)</span>`
             : `<span class="badge" style="background-color: ${g.shops.length === 3 ? 'rgba(139, 92, 246, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; color: ${g.shops.length === 3 ? '#a78bfa' : '#38bdf8'}; font-weight: bold;">Gom ${g.shops.length} Shop</span>`;
 
         tr.innerHTML = `
