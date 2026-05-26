@@ -218,10 +218,7 @@
                 </div>
             </div>
 
-            <!-- Alerts Section -->
-            <section class="alerts-section" id="alerts-container">
-                <!-- Alerts will be dynamically injected here -->
-            </section>
+
 
             <!-- Charts Section -->
             <section class="charts-grid">
@@ -283,18 +280,11 @@
                                 <th>Quận Lấy</th>
                                 <th>Mã BC Lấy</th>
                                 <th>Bưu Cục Lấy</th>
-                                <th>Tên Khách Hàng (Shop)</th>
                                 <th>Client ID</th>
                                 <th>Shop ID</th>
-                                <th>Mã Đơn Mẫu</th>
+                                <th>Tên Khách Hàng (Shop)</th>
                                 <th>Loại KH</th>
-                                <th>KTC Đầu Giao Gợi Ý</th>
-                                <th>Tỉnh Giao Lớn Nhất</th>
-                                <th>% Tỉnh Giao Lớn Nhất</th>
-                                <th>Sản Lượng Tuyến Lớn Nhất</th>
-                                <th>Nhóm Sản Lượng</th>
                                 <th>Tổng Vol</th>
-                                <th>Đơn Giao TC</th>
                                 <th>Tổng KL (Kg)</th>
                                 <th>Số Ngày Phái Sinh Đơn</th>
                                 <th>Số Ngày > 1000 Đơn</th>
@@ -303,13 +293,19 @@
                                 <th>% Đơn < 5kg</th>
                                 <th>% Nội Vùng</th>
                                 <th>% Liên Vùng</th>
-                                <th>% Rớt LC</th>
                                 <th>OPR</th>
-                                <th>ODR</th>
-                                <th>% Longtail</th>
                                 <th>% 0 - 9h</th>
                                 <th>% 9h - 19h</th>
                                 <th>% Sau 19h</th>
+                                <th>Đơn Giao TC</th>
+                                <th>ODR</th>
+                                <th>% Longtail</th>
+                                <th>% Rớt LC</th>
+                                <th>Tỉnh Giao Lớn Nhất</th>
+                                <th>% Tỉnh Giao Lớn Nhất</th>
+                                <th>Vol TB Tuyến Max</th>
+                                <th>Mã Đơn Mẫu</th>
+                                <th>KTC Đầu Giao Gợi Ý</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -336,14 +332,7 @@
                 <!-- Grouping Controls -->
                 <div class="grouping-controls-bar">
                     
-                    <!-- Min Combined Volume Slider -->
-                    <div style="flex: 1; min-width: 200px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Vol nhóm tối thiểu/ngày:</label>
-                            <span id="grouping-vol-val" style="color: var(--accent-blue); font-weight: bold; font-family: monospace; font-size: 1rem;">300 đơn</span>
-                        </div>
-                        <input type="range" id="grouping-min-vol" min="50" max="1500" step="50" value="300" style="width: 100%;">
-                    </div>
+
 
                     <!-- Min Combined Weight Slider -->
                     <div style="flex: 1; min-width: 200px;">
@@ -411,6 +400,7 @@
                                     <th style="text-align: center; width: 100px;">KTC Đầu Giao</th>
                                     <th style="min-width: 520px;">Danh Sách Shop Gom Nhóm (Sản Lượng, OPR & SLA, Trọng Lượng)</th>
                                     <th style="text-align: right; width: 140px;">Tổng Vol Gom/Ngày</th>
+                                    <th style="text-align: right; width: 140px;">Tổng KL Gom/Ngày (Kg)</th>
                                     <th style="text-align: right; width: 160px;">Hiệu Suất Xe Tải</th>
                                     <th style="text-align: center; width: 110px;">% Rớt LC Nhóm</th>
                                     <th style="text-align: center; width: 110px;">OPR TB Nhóm</th>

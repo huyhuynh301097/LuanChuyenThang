@@ -195,12 +195,6 @@ function setupEventListeners() {
             shopSearchInput.value = '';
         }
         // Reset grouping interactive selectors
-        const groupVolSlider = document.getElementById('grouping-min-vol');
-        if (groupVolSlider) {
-            groupVolSlider.value = 300;
-            const label = document.getElementById('grouping-vol-val');
-            if (label) label.textContent = '300 đơn';
-        }
         const groupWeightSlider = document.getElementById('grouping-min-weight');
         if (groupWeightSlider) {
             groupWeightSlider.value = 100;
@@ -261,14 +255,6 @@ function setupEventListeners() {
     }
 
     // Grouping Slicers listeners
-    const groupVolSlider = document.getElementById('grouping-min-vol');
-    if (groupVolSlider) {
-        groupVolSlider.addEventListener('input', (e) => {
-            const label = document.getElementById('grouping-vol-val');
-            if (label) label.textContent = `${e.target.value} đơn`;
-            updateGroupingTab();
-        });
-    }
 
     const groupWeightSlider = document.getElementById('grouping-min-weight');
     if (groupWeightSlider) {
@@ -331,8 +317,21 @@ function updateDashboard() {
 }
 
 // Formatter Helpers
-const formatNumber = (num) => new Intl.NumberFormat('vi-VN').format(Math.round(num));
-const formatPercent = (num) => (num * 100).toFixed(2) + '%';
+const formatNumber = (num) => {
+    if (num === null || num === undefined || isNaN(num)) return '-';
+    return new Intl.NumberFormat('vi-VN').format(Math.round(num));
+};
+const formatPercent = (num) => {
+    if (num === null || num === undefined || isNaN(num)) return '-';
+    return (num * 100).toFixed(2) + '%';
+};
+const formatFloat = (num, decimals = 2) => {
+    if (num === null || num === undefined || isNaN(num)) return '-';
+    return new Intl.NumberFormat('vi-VN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: decimals
+    }).format(num);
+};
 
 // Update Scorecards
 function updateScorecards() {
@@ -924,19 +923,7 @@ function renderShopDistributionChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return ` ${context.raw} Shop`;
-                        }
-                    }
-                }
-            },
-            cutout: '65%'
-        }
-    });
-}
-
-
-
-// Update Detailed Data Table
+                     // Update Detailed Data Table
 function updateTable() {
     const tbody = document.querySelector('#details-table tbody');
     tbody.innerHTML = '';
@@ -1006,163 +993,44 @@ function updateTable() {
             <td>${row.quan || '-'}</td>
             <td>${row.warehouse_id || '-'}</td>
             <td><strong>${row.warehouse_name || '-'}</strong></td>
-            <td style="color: var(--accent-blue); font-weight: bold;">${row.ten_kh || '-'}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.client_id || '-'}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.shop_id || '-'}</td>
-            <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
+            <td style="color: var(--accent-blue); font-weight: bold;">${row.ten_kh || '-'}</td>
             <td><span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa;">${row.loai_kh || '-'}</span></td>
-            <td><span class="badge badge-ktc">${row.KTC || '-'}</span></td>
-            <td style="font-weight: 600; color: var(--text-main);">${row.top_tinh_giao || '-'}</td>
-            <td style="font-weight: 600; color: var(--accent-teal);">${formatPercent(row.pct_top_tinh_giao || 0)}</td>
-            <td style="font-weight: 600; color: var(--accent-blue);">${formatNumber(row.vol_tb_ngay_top_tinh_giao || 0)}</td>
-            <td><span class="badge ${badgeClass}">${row.nhom_san_luong}</span></td>
             <td style="background-color: ${volBg}; font-weight: bold;">${formatNumber(row.vol)}</td>
-            <td style="font-weight: bold; color: var(--text-main);">${formatNumber(row.vol_delivered || 0)}</td>
-            <td>${formatNumber(row['kl(kg)'])}</td>
-            <td>${row.so_ngay_phat_sinh_don || '-'}</td>
-            <td>${row.so_ngay_tren_1000_don || '-'}</td>
-            <td>${formatNumber(row.vol_tb_ngay)}</td>
-            <td>${formatNumber(row['kl_tb_ngay(kg)'] || 0)}</td>
-            <td>${formatPercent(row.pct_don_duoi_5kg || 0)}</td>
-            <td>${formatPercent(row.pct_don_noi_vung || 0)}</td>
-            <td>${formatPercent(row.pct_don_lien_vung || 0)}</td>
-            <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(rotLc)}</td>
+            <td>${formatFloat(row.kl, 2)}</td>
+            <td>${formatNumber(row.so_ngay)}</td>
+            <td>${formatNumber(row.so_ngay_tren_1000)}</td>
+            <td>${formatFloat(row.vol_tb_ngay, 1)}</td>
+            <td>${formatFloat(row.kl_tb_ngay, 2)}</td>
+            <td>${formatPercent(row.pct_duoi_5kg || 0)}</td>
+            <td>${formatPercent(row.pct_noi_vung || 0)}</td>
+            <td>${formatPercent(row.pct_lien_vung || 0)}</td>
             <td style="background-color: ${oprBg}; color: white; font-weight: bold">${formatPercent(row.pct_opr)}</td>
-            <td style="background-color: ${odrBg}; color: white; font-weight: bold">${formatPercent(row.pct_odr || 0)}</td>
-            <td style="background-color: ${longtailBg}; color: white; font-weight: bold">${formatPercent(row.pct_longtail || 0)}</td>
             <td>${formatPercent(row.pct_gio_0_9 || 0)}</td>
             <td>${formatPercent(row.pct_gio_9_19 || 0)}</td>
             <td>${formatPercent(row.pct_gio_19p || 0)}</td>
+            <td style="font-weight: bold; color: var(--text-main);">${formatNumber(row.vol_delivered || 0)}</td>
+            <td style="background-color: ${odrBg}; color: white; font-weight: bold">${formatPercent(row.pct_odr || 0)}</td>
+            <td style="background-color: ${longtailBg}; color: white; font-weight: bold">${formatPercent(row.pct_longtail || 0)}</td>
+            <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(row.pct_rot_lc || 0)}</td>
+            <td style="font-weight: 600; color: var(--text-main);">${row.top_tinh_giao || '-'}</td>
+            <td style="font-weight: 600; color: var(--accent-teal);">${formatPercent(row.pct_top_tinh_giao || 0)}</td>
+            <td style="font-weight: 600; color: var(--accent-blue);">${formatFloat(row.vol_tb_ngay_top_tinh_giao, 1)}</td>
+            <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
+            <td><span class="badge badge-ktc">${row.KTC || '-'}</span></td>
         `;
         tbody.appendChild(tr);
     });
 
     if (tableData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="33" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="32" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
     }
 }
 
 // Generate Alerts
 function generateAlerts() {
-    const alertsContainer = document.getElementById('alerts-container');
-    alertsContainer.innerHTML = '';
-
-    // Calculate OPR, % Rớt LC, ODR, and Longtail by District
-    const districtData = {};
-    filteredData.forEach(row => {
-        const d = row.quan || 'Unknown';
-        if (!districtData[d]) {
-            districtData[d] = { 
-                vol: 0, 
-                totalOprVol: 0, 
-                totalRotLcVol: 0, 
-                totalOdrDelivered: 0,
-                totalLongtailDelivered: 0,
-                totalDeliveredVol: 0,
-                vung: row.vung 
-            };
-        }
-        districtData[d].vol += row.vol;
-        districtData[d].totalOprVol += (row.pct_opr * row.vol);
-        districtData[d].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
-        districtData[d].totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
-        districtData[d].totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
-        districtData[d].totalDeliveredVol += (row.vol_delivered || 0);
-    });
-
-    const badDistricts = Object.entries(districtData)
-        .map(([name, data]) => ({
-            name,
-            vung: data.vung,
-            vol: data.vol,
-            opr: data.vol > 0 ? (data.totalOprVol / data.vol) : 0,
-            rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0,
-            odr: data.totalDeliveredVol > 0 ? (data.totalOdrDelivered / data.totalDeliveredVol) : 0,
-            longtail: data.totalDeliveredVol > 0 ? (data.totalLongtailDelivered / data.totalDeliveredVol) : 0
-        }))
-        // Filter districts that have low OPR, high Rot LC, low ODR, OR high Longtail, with minimum 100 volume
-        .filter(d => (
-            (d.opr > 0 && d.opr < 0.9) || 
-            d.rotLc > 0.02 || 
-            (d.odr > 0 && d.odr < 0.92) || 
-            d.longtail > 0.08
-        ) && d.vol >= 100)
-        .sort((a, b) => {
-            // Combined risk with 1.5x weight for SLA metrics (ODR, Longtail)
-            const riskA = a.vol * ((1 - a.opr) + a.rotLc + 1.5 * (1 - a.odr) + 1.5 * a.longtail);
-            const riskB = b.vol * ((1 - b.opr) + b.rotLc + 1.5 * (1 - b.odr) + 1.5 * b.longtail);
-            return riskB - riskA; // High combined risk first
-        });
-
-    if (badDistricts.length > 0) {
-        // Only show top 3 alerts to avoid clutter
-        badDistricts.slice(0, 3).forEach(d => {
-            const alertCard = document.createElement('div');
-            alertCard.className = 'alert-card';
-            alertCard.innerHTML = `
-                <i class='bx bx-error-circle'></i>
-                <div class="alert-content">
-                    <h4>Cảnh Báo Quận/Huyện: Suy Giảm Chất Lượng tại ${d.name} (${d.vung})</h4>
-                    <p>SLA giao nhận bị ảnh hưởng lớn: ODR chỉ đạt <strong style="color: ${d.odr < 0.90 ? '#ef4444' : '#f97316'}">${(d.odr * 100).toFixed(1)}%</strong>, tỷ lệ Longtail trễ hạn ở mức <strong style="color: ${d.longtail > 0.10 ? '#ef4444' : '#f97316'}">${(d.longtail * 100).toFixed(1)}%</strong>. Chỉ số vận hành OPR: <strong>${(d.opr * 100).toFixed(1)}%</strong>, Rớt LC: <strong>${(d.rotLc * 100).toFixed(1)}%</strong> (Tổng vol: ${formatNumber(d.vol)} đơn).</p>
-                </div>
-            `;
-            alertsContainer.appendChild(alertCard);
-        });
-    }
-
-    // Add Shop Alerts
-    const badShops = [...filteredData]
-        .filter(d => 
-            (d.pct_opr > 0 && d.pct_opr < 0.9) || 
-            d.pct_rot_lc > 0.02 ||
-            (d.pct_odr > 0 && d.pct_odr < 0.92) ||
-            d.pct_longtail > 0.08
-        )
-        .filter(d => d.vol_tb_ngay >= 10)
-        .sort((a, b) => {
-            const riskA = a.vol * ((1 - a.pct_opr) + (a.pct_rot_lc || 0) + 1.5 * (1 - a.pct_odr) + 1.5 * (a.pct_longtail || 0));
-            const riskB = b.vol * ((1 - b.pct_opr) + (b.pct_rot_lc || 0) + 1.5 * (1 - b.pct_odr) + 1.5 * (b.pct_longtail || 0));
-            return riskB - riskA; // High combined risk first
-        });
-
-    if (badShops.length > 0) {
-        // Show up to 3 worst shops
-        badShops.slice(0, 3).forEach(s => {
-            const alertCard = document.createElement('div');
-            alertCard.className = 'alert-card';
-            alertCard.style.borderLeftColor = '#f43f5e';
-            
-            let shopAlertTitle = '';
-            let shopAlertDesc = '';
-            
-            const sRotLc = s.pct_rot_lc || 0;
-            const sOdr = s.pct_odr || 0;
-            const sLongtail = s.pct_longtail || 0;
-            
-            if ((sOdr < 0.92 || sLongtail > 0.08) && (s.pct_opr < 0.9 || sRotLc > 0.02)) {
-                shopAlertTitle = `Cảnh Báo Shop Suy Giảm SLA & Vận Hành: ${s.ten_kh}`;
-                shopAlertDesc = `Shop đồng thời gặp ODR thấp <strong>${(sOdr * 100).toFixed(1)}%</strong> (Longtail: <strong>${(sLongtail * 100).toFixed(1)}%</strong>) và OPR kém <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày.`;
-            } else if (sOdr < 0.92 || sLongtail > 0.08) {
-                shopAlertTitle = `Cảnh Báo Shop Trễ Hẹn SLA Giao: ${s.ten_kh}`;
-                shopAlertDesc = `Chất lượng giao hàng kém tại BC ${s.warehouse_name}: ODR đạt <strong>${(sOdr * 100).toFixed(1)}%</strong>, tỷ lệ Longtail trễ hạn lên tới <strong style="color: #f43f5e">${(sLongtail * 100).toFixed(1)}%</strong>. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (Tổng vol: ${formatNumber(s.vol)} đơn).`;
-            } else if (sRotLc > 0.02) {
-                shopAlertTitle = `Cảnh Báo Shop Rớt LC Cao: ${s.ten_kh}`;
-                shopAlertDesc = `Tỷ lệ rớt luân chuyển cao ở mức <strong>${(sRotLc * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày (OPR: ${(s.pct_opr * 100).toFixed(1)}%).`;
-            } else {
-                shopAlertTitle = `Cảnh Báo Shop OPR Thấp: ${s.ten_kh}`;
-                shopAlertDesc = `OPR rất thấp <strong>${(s.pct_opr * 100).toFixed(1)}%</strong> tại BC ${s.warehouse_name}. Sản lượng TB ${formatNumber(s.vol_tb_ngay)} đơn/ngày. Số ngày có vol > 1000 đơn: ${s.so_ngay_tren_1000_don || 0} ngày.`;
-            }
-
-            alertCard.innerHTML = `
-                <i class='bx bx-store-alt' style="color: #f43f5e"></i>
-                <div class="alert-content">
-                    <h4 style="color: #f43f5e">${shopAlertTitle}</h4>
-                    <p>${shopAlertDesc}</p>
-                </div>
-            `;
-            alertsContainer.appendChild(alertCard);
-        });
-    }
+    // Empty function to remove alerts as requested by user
 }
 
 // Generate Heatmaps
@@ -1311,8 +1179,8 @@ function calculateShopGroups() {
         s.odr_vol_sum += ((row.pct_odr || 0) * (row.vol_delivered || 0));
         s.longtail_vol_sum += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
         s.delivered_vol_sum += (row.vol_delivered || 0);
-        s.kl += row['kl(kg)'] || 0;
-        s.kl_tb_ngay_sum += row['kl_tb_ngay(kg)'] || 0;
+        s.kl += row.kl || row['kl(kg)'] || 0;
+        s.kl_tb_ngay_sum += row.kl_tb_ngay || row['kl_tb_ngay(kg)'] || 0;
         s.kl_tb_ngay_count++;
     });
 
@@ -1343,8 +1211,8 @@ function calculateShopGroups() {
                 loai_kh: s.loai_kh
             };
         })
-        .filter(s => s.avg_vol_tb_ngay < 1000 && s.total_vol > 0)
-        .sort((a, b) => b.avg_vol_tb_ngay - a.avg_vol_tb_ngay)
+        .filter(s => s.total_vol > 0)
+        .sort((a, b) => b.avg_kl_tb_ngay - a.avg_kl_tb_ngay)
         .slice(0, 10);
 
         if (candidateShops.length < 2) return;
@@ -1423,7 +1291,7 @@ function calculateShopGroups() {
         }
     });
 
-    recommendations.sort((a, b) => b.combined_vol_tb_ngay - a.combined_vol_tb_ngay);
+    recommendations.sort((a, b) => b.combined_kl_tb_ngay - a.combined_kl_tb_ngay);
 
     // Greedy: each shop appears in AT MOST ONE group
     const usedShopKeys = new Set();
@@ -1445,7 +1313,6 @@ function updateGroupingTab() {
 
     const groups = calculateShopGroups();
 
-    const minVol = parseInt(document.getElementById('grouping-min-vol')?.value || 300, 10);
     const minWeight = parseInt(document.getElementById('grouping-min-weight')?.value || 100, 10);
     const groupSize = document.getElementById('grouping-size')?.value || 'all';
     const groupTruck = document.getElementById('grouping-truck-type')?.value || 'all';
@@ -1453,7 +1320,6 @@ function updateGroupingTab() {
     const searchQuery = (document.getElementById('grouping-search')?.value || '').trim().toLowerCase();
 
     let filteredGroups = groups.filter(g => {
-        if (g.combined_vol_tb_ngay < minVol) return false;
         if (g.combined_kl_tb_ngay < minWeight) return false;
         if (groupSize === '2' && g.shops.length !== 2) return false;
         if (groupSize === '3' && g.shops.length !== 3) return false;
@@ -1489,7 +1355,7 @@ function updateGroupingTab() {
     });
 
     if (filteredGroups.length === 0) {
-        table.innerHTML = '<tr><td colspan="14" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
+        table.innerHTML = '<tr><td colspan="15" style="text-align: center; padding: 2rem; color: var(--text-muted);">Không tìm thấy đề xuất gom nhóm nào phù hợp với bộ lọc.</td></tr>';
         return;
     }
 
@@ -1523,11 +1389,11 @@ function updateGroupingTab() {
         let statusBadge = '';
         if (g.combined_odr < 0.90 || g.combined_longtail > 0.08) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.2)); color: #f43f5e; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;">Cải Thiện SLA</span>';
-        } else if (g.combined_vol_tb_ngay >= 1000) {
+        } else if (g.combined_kl_tb_ngay >= 2000) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20, 184, 166, 0.2)); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Siêu Tiềm Năng</span>';
-        } else if (g.combined_vol_tb_ngay >= 500) {
+        } else if (g.combined_kl_tb_ngay >= 1000) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.2)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Khả Thi Cao</span>';
-        } else if (g.combined_vol_tb_ngay >= 200) {
+        } else if (g.combined_kl_tb_ngay >= 500) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 179, 8, 0.2)); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); font-weight: 600;">Tiềm Năng</span>';
         } else {
             statusBadge = '<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);">Cần Nuôi Thêm</span>';
@@ -1620,6 +1486,16 @@ function updateGroupingTab() {
             </div>
         `;
 
+        const klProgressPct = Math.min(100, (g.combined_kl_tb_ngay / 2000) * 100); // normalized to 2000kg
+        const klProgressHtml = `
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;">
+                <span style="font-weight: bold; color: var(--accent-teal); font-size: 0.95rem; font-family: monospace;">${formatFloat(g.combined_kl_tb_ngay, 1)} kg</span>
+                <div style="width: 100px; height: 5px; background: rgba(51, 65, 85, 0.6); border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${klProgressPct}%; height: 100%; background: var(--accent-teal); border-radius: 3px;"></div>
+                </div>
+            </div>
+        `;
+
         tr.innerHTML = `
             <td style="text-align: center;"><span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: ${idx === 0 ? 'rgba(234, 179, 8, 0.2)' : idx === 1 ? 'rgba(148, 163, 184, 0.2)' : 'rgba(115, 115, 115, 0.2)'}; color: ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : '#a3a3a3'}; font-weight: bold; font-size: 0.85rem; border: 1px solid ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : 'transparent'};">${idx + 1}</span></td>
             <td style="font-weight: 700; color: white;">${g.warehouse_name}</td>
@@ -1629,6 +1505,7 @@ function updateGroupingTab() {
             <td style="text-align: center; vertical-align: middle;">${ktcText}</td>
             <td>${shopListHtml}</td>
             <td style="text-align: right; vertical-align: middle;">${volProgressHtml}</td>
+            <td style="text-align: right; vertical-align: middle;">${klProgressHtml}</td>
             <td style="text-align: right; vertical-align: middle;">${truckCapacityHtml}</td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${rotLcBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_rot_lc)}</span></td>
             <td style="text-align: center; vertical-align: middle;"><span class="badge" style="background-color: ${oprBg}; color: white; font-weight: bold; font-family: monospace; font-size: 0.85rem;">${formatPercent(g.combined_opr)}</span></td>
