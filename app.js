@@ -1016,6 +1016,7 @@ function updateTable() {
             <td style="font-weight: 600; color: var(--accent-teal);">${formatFloat(row.kl_tb_ngay_top_tinh_giao || 0, 2)}</td>
             <td style="font-weight: 600; color: var(--accent-blue);">${formatFloat(row.vol_tb_ngay_top_tinh_giao || 0, 1)}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
+            <td style="font-weight: 600; color: var(--accent-teal);">${row.KTC || '-'}</td>
         `;
         tbody.appendChild(tr);
     });
