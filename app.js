@@ -11,11 +11,9 @@ const filters = {
     region: new Set(),
     province: new Set(),
     district: new Set(),
-    volumeGroup: new Set(),
     hubType: new Set(),
     hub: new Set(),
     clientType: new Set(),
-    ktc: new Set(),
     flow: new Set()
 };
 
@@ -165,11 +163,11 @@ function processLoadedData(parsedRows) {
         const hubName = row.warehouse_name || '';
         const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
 
-        // Routing Flow Categorization
-        // Shop belongs to Flow 2 if it has a suggested KTC and high concentration (pct_top_tinh_giao >= 0.10)
-        // Otherwise, it goes to Flow 1
-        const hasKtc = row.KTC && String(row.KTC).trim() !== "" && String(row.KTC).toLowerCase() !== "nan" && String(row.KTC).toLowerCase() !== "null";
-        const flowType = (hasKtc && parseSafeFloat(row.pct_top_tinh_giao) > 0.50) ? '2' : '1';
+        // Routing Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if pct_top_tinh_giao > 50%
+        const flowType = (parseSafeFloat(row.pct_top_tinh_giao) > 0.50) ? '2' : '1';
+
+        // Destination hub is top_tinh_giao for Flow 2
+        const ktcDest = flowType === '2' ? (row.top_tinh_giao || 'Không rõ') : 'KTC Đầu Lấy';
 
         // Compatibility mapping
         const klParsed = parseSafeFloat(row.kl !== undefined ? row.kl : row['kl(kg)']);
@@ -186,24 +184,31 @@ function processLoadedData(parsedRows) {
             hub_type: hubType,
             flow_type: flowType,
             vol: parseSafeFloat(row.vol),
+            kl: klParsed,
             'kl(kg)': klParsed,
+            so_ngay: soNgayParsed,
             so_ngay_phat_sinh_don: soNgayParsed,
+            so_ngay_tren_1000: soNgay1000Parsed,
             so_ngay_tren_1000_don: soNgay1000Parsed,
+            kl_tb_ngay: klTbNgayParsed,
             'kl_tb_ngay(kg)': klTbNgayParsed,
+            pct_duoi_5kg: pctDuoi5kgParsed,
             pct_don_duoi_5kg: pctDuoi5kgParsed,
+            pct_noi_vung: pctNoiVungParsed,
             pct_don_noi_vung: pctNoiVungParsed,
+            pct_lien_vung: pctLienVungParsed,
             pct_don_lien_vung: pctLienVungParsed,
             pct_opr: parseSafeFloat(row.pct_opr),
             pct_gio_0_9: parseSafeFloat(row.pct_gio_0_9),
             pct_gio_9_19: parseSafeFloat(row.pct_gio_9_19),
             pct_gio_19p: parseSafeFloat(row.pct_gio_19p),
             pct_rot_lc: parseSafeFloat(row.pct_rot_lc),
-            vol_delivered: parseSafeFloat(row.vol_delivered),
             pct_odr: parseSafeFloat(row.pct_odr),
             pct_longtail: parseSafeFloat(row.pct_longtail),
-            KTC: hasKtc ? String(row.KTC).trim() : 'Không rõ',
+            KTC: ktcDest,
             top_tinh_giao: row.top_tinh_giao || 'Không rõ',
             pct_top_tinh_giao: parseSafeFloat(row.pct_top_tinh_giao),
+            kl_tb_ngay_top_tinh_giao: parseSafeFloat(row.kl_tb_ngay_top_tinh_giao),
             vol_tb_ngay_top_tinh_giao: parseSafeFloat(row.vol_tb_ngay_top_tinh_giao),
             loai_kh: row.loai_kh || 'Chưa phân loại',
             
@@ -220,13 +225,7 @@ function processLoadedData(parsedRows) {
             order_code_mau: row.order_code_mau ? String(row.order_code_mau).trim() : '',
             
             // For older script templates compatibility
-            vol_tb_ngay: volTbNgay,
-            kl_tb_ngay: klTbNgayParsed,
-            pct_duoi_5kg: pctDuoi5kgParsed,
-            pct_noi_vung: pctNoiVungParsed,
-            pct_lien_vung: pctLienVungParsed,
-            so_ngay: soNgayParsed,
-            so_ngay_tren_1000: soNgay1000Parsed
+            vol_tb_ngay: volTbNgay
         };
     });
 
@@ -245,11 +244,11 @@ function initializeFilters() {
     populateCheckboxes('filter-hub-type', ['KHL', 'Bưu Cục']);
     populateCheckboxes('filter-hub', [...new Set(rawData.map(d => d.warehouse_name).filter(Boolean))].sort());
     populateCheckboxes('filter-client-type', [...new Set(rawData.map(d => d.loai_kh).filter(Boolean))].sort());
-    populateCheckboxes('filter-ktc', [...new Set(rawData.map(d => d.KTC).filter(d => d && d !== 'Không rõ'))].sort());
 }
 
 function populateCheckboxes(elementId, options) {
     const container = document.getElementById(elementId);
+    if (!container) return;
     container.innerHTML = '';
     options.forEach(opt => {
         const label = document.createElement('label');
@@ -275,11 +274,9 @@ function setupEventListeners() {
         { id: 'filter-region', prop: 'region' },
         { id: 'filter-province', prop: 'province' },
         { id: 'filter-district', prop: 'district' },
-        { id: 'filter-volume', prop: 'volumeGroup' },
         { id: 'filter-hub-type', prop: 'hubType' },
         { id: 'filter-hub', prop: 'hub' },
         { id: 'filter-client-type', prop: 'clientType' },
-        { id: 'filter-ktc', prop: 'ktc' },
         { id: 'filter-flow', prop: 'flow' }
     ];
 
@@ -398,17 +395,15 @@ function applyFilters() {
         const matchRegion = filters.region.size === 0 || filters.region.has(row.vung);
         const matchProvince = filters.province.size === 0 || filters.province.has(row.tinh);
         const matchDistrict = filters.district.size === 0 || filters.district.has(row.quan);
-        const matchVolume = filters.volumeGroup.size === 0 || filters.volumeGroup.has(row.nhom_san_luong);
         const matchHubType = filters.hubType.size === 0 || filters.hubType.has(row.hub_type);
         const matchHub = filters.hub.size === 0 || filters.hub.has(row.warehouse_name);
         
         // New filters
         const matchClient = filters.clientType.size === 0 || filters.clientType.has(row.loai_kh);
-        const matchKtc = filters.ktc.size === 0 || filters.ktc.has(row.KTC);
         const matchFlow = filters.flow.size === 0 || filters.flow.has(row.flow_type);
 
-        return matchMonth && matchRegion && matchProvince && matchDistrict && matchVolume && 
-               matchHubType && matchHub && matchClient && matchKtc && matchFlow;
+        return matchMonth && matchRegion && matchProvince && matchDistrict && 
+               matchHubType && matchHub && matchClient && matchFlow;
     });
 
     updateDashboard();
@@ -491,17 +486,15 @@ function updateScorecards() {
     const avgOpr = totalVol > 0 ? (totalOprVol / totalVol) : 0;
     const avgRotLc = totalVol > 0 ? (totalRotLcVol / totalVol) : 0;
     
-    // Weighted Average ODR & Longtail (weighted by vol_delivered)
-    let totalOdrDelivered = 0;
-    let totalLongtailDelivered = 0;
-    let totalDeliveredVol = 0;
+    // Weighted Average ODR & Longtail (weighted by vol)
+    let totalOdrVol = 0;
+    let totalLongtailVol = 0;
     filteredData.forEach(row => {
-        totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
-        totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
-        totalDeliveredVol += (row.vol_delivered || 0);
+        totalOdrVol += ((row.pct_odr || 0) * row.vol);
+        totalLongtailVol += ((row.pct_longtail || 0) * row.vol);
     });
-    const avgOdr = totalDeliveredVol > 0 ? (totalOdrDelivered / totalDeliveredVol) : 0;
-    const avgLongtail = totalDeliveredVol > 0 ? (totalLongtailDelivered / totalDeliveredVol) : 0;
+    const avgOdr = totalVol > 0 ? (totalOdrVol / totalVol) : 0;
+    const avgLongtail = totalVol > 0 ? (totalLongtailVol / totalVol) : 0;
     
     const totalShops = filteredData.length;
 
@@ -527,29 +520,6 @@ function updateScorecards() {
 
     const elLongtail = document.getElementById('score-longtail');
     if (elLongtail) elLongtail.textContent = formatPercent(avgLongtail);
-
-    // Flow 1 vs Flow 2 metrics
-    let flow2Vol = 0;
-    let flow1Vol = 0;
-    filteredData.forEach(row => {
-        if (row.flow_type === '2') {
-            flow2Vol += row.vol;
-        } else {
-            flow1Vol += row.vol;
-        }
-    });
-    const flow2Pct = totalVol > 0 ? (flow2Vol / totalVol) : 0;
-    const flow1Pct = totalVol > 0 ? (flow1Vol / totalVol) : 0;
-
-    const elFlow2Pct = document.getElementById('score-flow2-pct');
-    if (elFlow2Pct) elFlow2Pct.textContent = formatPercent(flow2Pct);
-    const elFlow2Vol = document.getElementById('score-flow2-vol');
-    if (elFlow2Vol) elFlow2Vol.textContent = formatNumber(flow2Vol) + ' đơn';
-
-    const elFlow1Pct = document.getElementById('score-flow1-pct');
-    if (elFlow1Pct) elFlow1Pct.textContent = formatPercent(flow1Pct);
-    const elFlow1Vol = document.getElementById('score-flow1-vol');
-    if (elFlow1Vol) elFlow1Vol.textContent = formatNumber(flow1Vol) + ' đơn';
 }
 
 // Chart Configurations
@@ -561,8 +531,6 @@ Chart.defaults.color = '#94a3b8';
 Chart.defaults.font.family = 'Inter';
 
 function renderCharts() {
-    renderTopShopsChart();
-    renderShopDistributionChart();
     renderFocusShopsChart();
 }
 
@@ -761,67 +729,7 @@ function renderFocusShopsChart() {
 }
 
 
-function renderTopShopsChart() {
-    const ctx = document.getElementById('chart-top-shops').getContext('2d');
-    
-    // Sort raw shops by vol_tb_ngay
-    const sortedShops = [...filteredData]
-        .sort((a, b) => b.vol_tb_ngay - a.vol_tb_ngay)
-        .slice(0, 15);
 
-    const labels = sortedShops.map(s => {
-        let name = s.ten_kh || s.warehouse_name || 'Unknown';
-        return name.length > 25 ? name.substring(0, 25) + '...' : name;
-    });
-    const data = sortedShops.map(s => s.vol_tb_ngay);
-    const oprs = sortedShops.map(s => s.pct_opr * 100);
-
-    if (charts.topShops) charts.topShops.destroy();
-
-    charts.topShops = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Sản Lượng (Đơn/Ngày)',
-                data: data,
-                backgroundColor: sortedShops.map(s => (((s.pct_odr || 0) < 0.92 || (s.pct_longtail || 0) > 0.08) ? 'rgba(239, 68, 68, 0.8)' : 'rgba(168, 85, 247, 0.8)')),
-                borderRadius: 4
-            }]
-        },
-        options: {
-            indexAxis: 'y', // Horizontal bar chart
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { grid: { color: 'rgba(51, 65, 85, 0.5)' } },
-                y: { grid: { display: false } }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Sản lượng: ${Math.round(context.raw).toLocaleString()} Đơn`;
-                        },
-                        afterLabel: function(context) {
-                            const shop = sortedShops[context.dataIndex];
-                            return [
-                                `Khối lượng TB: ${Math.round(shop['kl_tb_ngay(kg)'] || 0).toLocaleString()} Kg/Ngày`,
-                                `ODR: ${((shop.pct_odr || 0) * 100).toFixed(1)}%`,
-                                `Longtail: ${((shop.pct_longtail || 0) * 100).toFixed(1)}%`,
-                                `OPR: ${oprs[context.dataIndex].toFixed(1)}%`,
-                                `% Rớt LC: ${((shop.pct_rot_lc || 0) * 100).toFixed(1)}%`,
-                                `Số ngày >1000 đơn: ${shop.so_ngay_tren_1000_don || 0} ngày`,
-                                `${shop.warehouse_name || 'Không rõ'}`
-                            ];
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
 
 function updateTrendShopOptions() {
     const select = document.getElementById('trend-shop-select');
@@ -1016,69 +924,12 @@ function renderShopTrendChart() {
 
 
 
-function renderShopDistributionChart() {
-    const ctx = document.getElementById('chart-shop-distribution').getContext('2d');
-    
-    const dist = {
-        '1. Duoi 100 don/ngay': 0,
-        '2. 100 - 300 don/ngay': 0,
-        '3. 300 - 500 don/ngay': 0,
-        '4. 500 - 1000 don/ngay': 0,
-        '5. Trên 1000 don/ngay': 0
-    };
 
-    filteredData.forEach(row => {
-        if (dist[row.nhom_san_luong] !== undefined) {
-            dist[row.nhom_san_luong]++;
-        }
-    });
-
-    if (charts.shopDist) charts.shopDist.destroy();
-
-    const chartLabels = Object.keys(dist).map(key => `${key}: ${dist[key]} Shop`);
-
-    charts.shopDist = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: chartLabels,
-            datasets: [{
-                data: Object.values(dist),
-                backgroundColor: [
-                    'rgba(148, 163, 184, 0.8)',
-                    'rgba(56, 189, 248, 0.8)',
-                    'rgba(59, 130, 246, 0.8)',
-                    'rgba(20, 184, 166, 0.8)',
-                    'rgba(168, 85, 247, 0.8)'
-                ],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { 
-                    display: true,
-                    position: 'bottom',
-                    labels: { color: 'rgba(241, 245, 249, 1)', padding: 10 }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.raw} Shop`;
-                        }
-                    }
-                }
-            },
-            cutout: '65%'
-        }
-    });
-}
 
 // Update Detailed Data Table
 function updateTable() {
     const tbody = document.querySelector('#details-table tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     const shopSearchVal = (document.getElementById('detail-shop-search')?.value || '').trim().toLowerCase();
@@ -1099,12 +950,6 @@ function updateTable() {
     tableData.forEach(row => {
         const tr = document.createElement('tr');
         
-        let badgeClass = 'badge-1';
-        if (row.nhom_san_luong.startsWith('2')) badgeClass = 'badge-2';
-        else if (row.nhom_san_luong.startsWith('3')) badgeClass = 'badge-3';
-        else if (row.nhom_san_luong.startsWith('4')) badgeClass = 'badge-4';
-        else if (row.nhom_san_luong.startsWith('5')) badgeClass = 'badge-5';
-
         // Highlight low OPR, low ODR, or high Longtail in red
         if (row.pct_opr < 0.9 || row.pct_odr < 0.92 || row.pct_longtail > 0.08) {
             tr.className = 'danger-row';
@@ -1159,25 +1004,24 @@ function updateTable() {
             <td>${formatPercent(row.pct_duoi_5kg || 0)}</td>
             <td>${formatPercent(row.pct_noi_vung || 0)}</td>
             <td>${formatPercent(row.pct_lien_vung || 0)}</td>
-            <td style="background-color: ${oprBg}; color: white; font-weight: bold">${formatPercent(row.pct_opr)}</td>
             <td>${formatPercent(row.pct_gio_0_9 || 0)}</td>
             <td>${formatPercent(row.pct_gio_9_19 || 0)}</td>
             <td>${formatPercent(row.pct_gio_19p || 0)}</td>
-            <td style="font-weight: bold; color: var(--text-main);">${formatNumber(row.vol_delivered || 0)}</td>
+            <td style="background-color: ${oprBg}; color: white; font-weight: bold">${formatPercent(row.pct_opr)}</td>
+            <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(row.pct_rot_lc || 0)}</td>
             <td style="background-color: ${odrBg}; color: white; font-weight: bold">${formatPercent(row.pct_odr || 0)}</td>
             <td style="background-color: ${longtailBg}; color: white; font-weight: bold">${formatPercent(row.pct_longtail || 0)}</td>
-            <td style="background-color: ${rotLcBg}; color: white; font-weight: bold">${formatPercent(row.pct_rot_lc || 0)}</td>
             <td style="font-weight: 600; color: var(--text-main);">${row.top_tinh_giao || '-'}</td>
             <td style="font-weight: 600; color: var(--accent-teal);">${formatPercent(row.pct_top_tinh_giao || 0)}</td>
-            <td style="font-weight: 600; color: var(--accent-blue);">${formatFloat(row.vol_tb_ngay_top_tinh_giao, 1)}</td>
+            <td style="font-weight: 600; color: var(--accent-teal);">${formatFloat(row.kl_tb_ngay_top_tinh_giao || 0, 2)}</td>
+            <td style="font-weight: 600; color: var(--accent-blue);">${formatFloat(row.vol_tb_ngay_top_tinh_giao || 0, 1)}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">${row.order_code_mau || '-'}</td>
-            <td><span class="badge badge-ktc">${row.KTC || '-'}</span></td>
         `;
         tbody.appendChild(tr);
     });
 
     if (tableData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="32" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="31" style="text-align: center; padding: 2rem;">Không tìm thấy dữ liệu phù hợp với bộ lọc.</td></tr>';
     }
 }
 
@@ -1189,6 +1033,7 @@ function generateAlerts() {
 // Generate Heatmaps
 function renderHeatmaps() {
     const container = document.getElementById('heatmap-container');
+    if (!container) return;
     container.innerHTML = '';
 
     // Group by Region then District
@@ -1202,17 +1047,15 @@ function renderHeatmaps() {
                 vol: 0, 
                 totalOprVol: 0, 
                 totalRotLcVol: 0,
-                totalOdrDelivered: 0,
-                totalLongtailDelivered: 0,
-                totalDeliveredVol: 0
+                totalOdrVol: 0,
+                totalLongtailVol: 0
             };
         }
         regions[r][d].vol += row.vol;
         regions[r][d].totalOprVol += (row.pct_opr * row.vol);
         regions[r][d].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
-        regions[r][d].totalOdrDelivered += ((row.pct_odr || 0) * (row.vol_delivered || 0));
-        regions[r][d].totalLongtailDelivered += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
-        regions[r][d].totalDeliveredVol += (row.vol_delivered || 0);
+        regions[r][d].totalOdrVol += ((row.pct_odr || 0) * row.vol);
+        regions[r][d].totalLongtailVol += ((row.pct_longtail || 0) * row.vol);
     });
 
     Object.keys(regions).sort().forEach(r => {
@@ -1222,8 +1065,8 @@ function renderHeatmaps() {
             vol: data.vol,
             opr: data.vol > 0 ? (data.totalOprVol / data.vol) : 0,
             rotLc: data.vol > 0 ? (data.totalRotLcVol / data.vol) : 0,
-            odr: data.totalDeliveredVol > 0 ? (data.totalOdrDelivered / data.totalDeliveredVol) : 0,
-            longtail: data.totalDeliveredVol > 0 ? (data.totalLongtailDelivered / data.totalDeliveredVol) : 0
+            odr: data.vol > 0 ? (data.totalOdrVol / data.vol) : 0,
+            longtail: data.vol > 0 ? (data.totalLongtailVol / data.vol) : 0
         })).sort((a, b) => b.vol - a.vol); // Sort by volume descending
 
         if (districts.length === 0) return;
@@ -1285,90 +1128,170 @@ function renderHeatmaps() {
 
 // Calculate combinations of 2 and 3 shops for each (quan, warehouse_name, flow, KTC) cluster
 function calculateShopGroups() {
-    const clusters = {};
-
+    const shopsMap = {};
+    
     filteredData.forEach(row => {
         const quan = row.quan;
         const whName = row.warehouse_name;
         const shop = row.ten_kh;
-        const flow = row.flow_type; // '1' or '2'
-        const ktcDest = row.KTC || 'Không rõ';
-
+        
         if (!quan || !whName || !shop) return;
-
-        // Grouping key includes flow type and KTC destination
-        const clusterKey = flow === '2' 
-            ? `${quan} ||| ${whName} ||| Flow2 ||| ${ktcDest}`
-            : `${quan} ||| ${whName} ||| Flow1 ||| Origin`;
-
-        if (!clusters[clusterKey]) {
-            clusters[clusterKey] = {};
-        }
-
-        if (!clusters[clusterKey][shop]) {
-            clusters[clusterKey][shop] = {
+        const shopKey = `${quan} ||| ${whName} ||| ${shop}`;
+        
+        if (!shopsMap[shopKey]) {
+            shopsMap[shopKey] = {
                 ten_kh: shop,
-                vol: 0,
+                quan: quan,
+                warehouse_name: whName,
+                vol_sum: 0,
+                vol_count: 0,
+                kl_sum: 0,
+                kl_count: 0,
                 vol_tb_ngay_sum: 0,
                 vol_tb_ngay_count: 0,
+                kl_tb_ngay_sum: 0,
+                kl_tb_ngay_count: 0,
+                pct_top_tinh_giao_sum: 0,
+                pct_top_tinh_giao_count: 0,
+                kl_tb_ngay_top_tinh_giao_sum: 0,
+                kl_tb_ngay_top_tinh_giao_count: 0,
+                vol_tb_ngay_top_tinh_giao_sum: 0,
+                vol_tb_ngay_top_tinh_giao_count: 0,
+                top_tinh_giao: row.top_tinh_giao || 'Không rõ',
+                loai_kh: row.loai_kh || 'Chưa phân loại',
+                
+                // SLA & OPR aggregations
                 opr_vol_sum: 0,
                 rot_lc_vol_sum: 0,
                 odr_vol_sum: 0,
                 longtail_vol_sum: 0,
-                delivered_vol_sum: 0,
-                kl: 0,
-                kl_tb_ngay_sum: 0,
-                kl_tb_ngay_count: 0,
-                loai_kh: row.loai_kh
+                total_vol: 0
             };
         }
-
-        const s = clusters[clusterKey][shop];
-        s.vol += row.vol || 0;
-        s.vol_tb_ngay_sum += row.vol_tb_ngay || 0;
+        
+        const s = shopsMap[shopKey];
+        s.vol_sum += parseSafeFloat(row.vol);
+        s.vol_count++;
+        s.kl_sum += parseSafeFloat(row.kl || row['kl(kg)']);
+        s.kl_count++;
+        
+        s.vol_tb_ngay_sum += parseSafeFloat(row.vol_tb_ngay);
         s.vol_tb_ngay_count++;
-        s.opr_vol_sum += (row.pct_opr || 0) * (row.vol || 0);
-        s.rot_lc_vol_sum += ((row.pct_rot_lc || 0) * (row.vol || 0));
-        s.odr_vol_sum += ((row.pct_odr || 0) * (row.vol_delivered || 0));
-        s.longtail_vol_sum += ((row.pct_longtail || 0) * (row.vol_delivered || 0));
-        s.delivered_vol_sum += (row.vol_delivered || 0);
-        s.kl += row.kl || row['kl(kg)'] || 0;
-        s.kl_tb_ngay_sum += row.kl_tb_ngay || row['kl_tb_ngay(kg)'] || 0;
+        s.kl_tb_ngay_sum += parseSafeFloat(row.kl_tb_ngay || row['kl_tb_ngay(kg)']);
         s.kl_tb_ngay_count++;
+        
+        s.pct_top_tinh_giao_sum += parseSafeFloat(row.pct_top_tinh_giao);
+        s.pct_top_tinh_giao_count++;
+        s.kl_tb_ngay_top_tinh_giao_sum += parseSafeFloat(row.kl_tb_ngay_top_tinh_giao);
+        s.kl_tb_ngay_top_tinh_giao_count++;
+        s.vol_tb_ngay_top_tinh_giao_sum += parseSafeFloat(row.vol_tb_ngay_top_tinh_giao);
+        s.vol_tb_ngay_top_tinh_giao_count++;
+        
+        const rowVol = parseSafeFloat(row.vol);
+        s.total_vol += rowVol;
+        s.opr_vol_sum += parseSafeFloat(row.pct_opr) * rowVol;
+        s.rot_lc_vol_sum += parseSafeFloat(row.pct_rot_lc) * rowVol;
+        s.odr_vol_sum += parseSafeFloat(row.pct_odr) * rowVol;
+        s.longtail_vol_sum += parseSafeFloat(row.pct_longtail) * rowVol;
     });
 
-    const recommendations = [];
+    const shopsList = Object.values(shopsMap).map(s => {
+        const avgVolTbNgay = s.vol_tb_ngay_count > 0 ? (s.vol_tb_ngay_sum / s.vol_tb_ngay_count) : 0;
+        const avgKlTbNgay = s.kl_tb_ngay_count > 0 ? (s.kl_tb_ngay_sum / s.kl_tb_ngay_count) : 0;
+        const avgPctTopTinhGiao = s.pct_top_tinh_giao_count > 0 ? (s.pct_top_tinh_giao_sum / s.pct_top_tinh_giao_count) : 0;
+        const avgKlTopTinhGiao = s.kl_tb_ngay_top_tinh_giao_count > 0 ? (s.kl_tb_ngay_top_tinh_giao_sum / s.kl_tb_ngay_top_tinh_giao_count) : 0;
+        const avgVolTopTinhGiao = s.vol_tb_ngay_top_tinh_giao_count > 0 ? (s.vol_tb_ngay_top_tinh_giao_sum / s.vol_tb_ngay_top_tinh_giao_count) : 0;
+        
+        const weightedOpr = s.total_vol > 0 ? (s.opr_vol_sum / s.total_vol) : 0;
+        const weightedRotLc = s.total_vol > 0 ? (s.rot_lc_vol_sum / s.total_vol) : 0;
+        const weightedOdr = s.total_vol > 0 ? (s.odr_vol_sum / s.total_vol) : 0;
+        const weightedLongtail = s.total_vol > 0 ? (s.longtail_vol_sum / s.total_vol) : 0;
+        
+        // Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if top province ratio > 50%
+        const flowType = (avgPctTopTinhGiao > 0.50) ? '2' : '1';
+        
+        // Destination label
+        const ktcDest = flowType === '2' ? s.top_tinh_giao : 'KTC Đầu Lấy';
 
-    Object.entries(clusters).forEach(([clusterKey, shopsMap]) => {
-        const [quan, whName, flowText, ktcDest] = clusterKey.split(' ||| ');
-        const flowVal = flowText === 'Flow2' ? '2' : '1';
+        return {
+            ten_kh: s.ten_kh,
+            quan: s.quan,
+            warehouse_name: s.warehouse_name,
+            avg_vol_tb_ngay: avgVolTbNgay,
+            avg_kl_tb_ngay: avgKlTbNgay,
+            pct_top_tinh_giao: avgPctTopTinhGiao,
+            kl_tb_ngay_top_tinh_giao: avgKlTopTinhGiao,
+            vol_tb_ngay_top_tinh_giao: avgVolTopTinhGiao,
+            top_tinh_giao: s.top_tinh_giao,
+            loai_kh: s.loai_kh,
+            flow_type: flowType,
+            KTC: ktcDest,
+            
+            weighted_opr: weightedOpr,
+            weighted_rot_lc: weightedRotLc,
+            weighted_odr: weightedOdr,
+            weighted_longtail: weightedLongtail,
+            total_vol: s.total_vol
+        };
+    });
 
-        const candidateShops = Object.values(shopsMap).map(s => {
-            const avgVolTbNgay = s.vol_tb_ngay_count > 0 ? (s.vol_tb_ngay_sum / s.vol_tb_ngay_count) : 0;
-            const avgKlTbNgay = s.kl_tb_ngay_count > 0 ? (s.kl_tb_ngay_sum / s.kl_tb_ngay_count) : 0;
-            const weightedOpr = s.vol > 0 ? (s.opr_vol_sum / s.vol) : 0;
-            const weightedRotLc = s.vol > 0 ? (s.rot_lc_vol_sum / s.vol) : 0;
-            const weightedOdr = s.delivered_vol_sum > 0 ? (s.odr_vol_sum / s.delivered_vol_sum) : 0;
-            const weightedLongtail = s.delivered_vol_sum > 0 ? (s.longtail_vol_sum / s.delivered_vol_sum) : 0;
-            return {
-                ten_kh: s.ten_kh,
-                avg_vol_tb_ngay: avgVolTbNgay,
-                avg_kl_tb_ngay: avgKlTbNgay,
-                weighted_opr: weightedOpr,
-                weighted_rot_lc: weightedRotLc,
-                weighted_odr: weightedOdr,
-                weighted_longtail: weightedLongtail,
-                total_vol: s.vol,
-                total_delivered_vol: s.delivered_vol_sum,
-                total_weight: s.kl,
-                loai_kh: s.loai_kh
-            };
-        })
-        .filter(s => s.total_vol > 0)
-        .sort((a, b) => b.avg_kl_tb_ngay - a.avg_kl_tb_ngay)
-        .slice(0, 10);
+    const singleShopSuggestions = [];
+    const groupingCandidates = [];
+
+    // Separate shops into Direct Dispatch (Single Shop) or Grouping Candidates
+    shopsList.forEach(s => {
+        // Threshold for single shop to go alone: 1000 kg (1 Ton)
+        // For Luồng 2: based on kl_tb_ngay_top_tinh_giao
+        // For Luồng 1: based on avg_kl_tb_ngay
+        const weightForRouting = s.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
+        const volForRouting = s.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
+        
+        if (weightForRouting >= 1000) {
+            // Can go alone!
+            singleShopSuggestions.push({
+                is_single: true,
+                quan: s.quan,
+                warehouse_name: s.warehouse_name,
+                flow_type: s.flow_type,
+                KTC: s.KTC,
+                shops: [s],
+                combined_vol_tb_ngay: volForRouting,
+                combined_kl_tb_ngay: weightForRouting,
+                combined_vol: s.total_vol,
+                combined_opr: s.weighted_opr,
+                combined_rot_lc: s.weighted_rot_lc,
+                combined_odr: s.weighted_odr,
+                combined_longtail: s.weighted_longtail
+            });
+        } else {
+            groupingCandidates.push(s);
+        }
+    });
+
+    // 2. Grouping for Candidates (under 1000kg)
+    // Group candidates by: quan + warehouse_name + flow_type + KTC
+    const clusters = {};
+    groupingCandidates.forEach(s => {
+        const clusterKey = `${s.quan} ||| ${s.warehouse_name} ||| ${s.flow_type} ||| ${s.KTC}`;
+        if (!clusters[clusterKey]) {
+            clusters[clusterKey] = [];
+        }
+        clusters[clusterKey].push(s);
+    });
+
+    const groupSuggestions = [];
+
+    Object.entries(clusters).forEach(([clusterKey, candidateShops]) => {
+        const [quan, whName, flowVal, ktcDest] = clusterKey.split(' ||| ');
 
         if (candidateShops.length < 2) return;
+
+        // Sort candidateShops by routing weight descending
+        candidateShops.sort((a, b) => {
+            const weightA = a.flow_type === '2' ? a.kl_tb_ngay_top_tinh_giao : a.avg_kl_tb_ngay;
+            const weightB = b.flow_type === '2' ? b.kl_tb_ngay_top_tinh_giao : b.avg_kl_tb_ngay;
+            return weightB - weightA;
+        });
 
         // Size 2 combinations
         for (let i = 0; i < candidateShops.length; i++) {
@@ -1376,24 +1299,28 @@ function calculateShopGroups() {
                 const s1 = candidateShops[i];
                 const s2 = candidateShops[j];
                 
+                const w1 = s1.flow_type === '2' ? s1.kl_tb_ngay_top_tinh_giao : s1.avg_kl_tb_ngay;
+                const w2 = s2.flow_type === '2' ? s2.kl_tb_ngay_top_tinh_giao : s2.avg_kl_tb_ngay;
+                
+                const v1 = s1.flow_type === '2' ? s1.vol_tb_ngay_top_tinh_giao : s1.avg_vol_tb_ngay;
+                const v2 = s2.flow_type === '2' ? s2.vol_tb_ngay_top_tinh_giao : s2.avg_vol_tb_ngay;
+
                 const combinedVol = s1.total_vol + s2.total_vol;
-                const combinedDelivered = s1.total_delivered_vol + s2.total_delivered_vol;
                 const combinedOpr = combinedVol > 0 ? ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol)) / combinedVol : 0;
                 const combinedRotLc = combinedVol > 0 ? ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol)) / combinedVol : 0;
-                const combinedOdr = combinedDelivered > 0 ? ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol)) / combinedDelivered : 0;
-                const combinedLongtail = combinedDelivered > 0 ? ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol)) / combinedDelivered : 0;
-                const combinedKlTbNgay = s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay;
+                const combinedOdr = combinedVol > 0 ? ((s1.weighted_odr * s1.total_vol) + (s2.weighted_odr * s2.total_vol)) / combinedVol : 0;
+                const combinedLongtail = combinedVol > 0 ? ((s1.weighted_longtail * s1.total_vol) + (s2.weighted_longtail * s2.total_vol)) / combinedVol : 0;
 
-                recommendations.push({
+                groupSuggestions.push({
+                    is_single: false,
                     quan,
                     warehouse_name: whName,
                     flow_type: flowVal,
                     KTC: ktcDest,
                     shops: [s1, s2],
-                    combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay,
-                    combined_kl_tb_ngay: combinedKlTbNgay,
+                    combined_vol_tb_ngay: v1 + v2,
+                    combined_kl_tb_ngay: w1 + w2,
                     combined_vol: combinedVol,
-                    combined_delivered_vol: combinedDelivered,
                     combined_opr: combinedOpr,
                     combined_rot_lc: combinedRotLc,
                     combined_odr: combinedOdr,
@@ -1411,28 +1338,34 @@ function calculateShopGroups() {
                         const s2 = candidateShops[j];
                         const s3 = candidateShops[k];
                         
+                        const w1 = s1.flow_type === '2' ? s1.kl_tb_ngay_top_tinh_giao : s1.avg_kl_tb_ngay;
+                        const w2 = s2.flow_type === '2' ? s2.kl_tb_ngay_top_tinh_giao : s2.avg_kl_tb_ngay;
+                        const w3 = s3.flow_type === '2' ? s3.kl_tb_ngay_top_tinh_giao : s3.avg_kl_tb_ngay;
+                        
+                        const v1 = s1.flow_type === '2' ? s1.vol_tb_ngay_top_tinh_giao : s1.avg_vol_tb_ngay;
+                        const v2 = s2.flow_type === '2' ? s2.vol_tb_ngay_top_tinh_giao : s2.avg_vol_tb_ngay;
+                        const v3 = s3.flow_type === '2' ? s3.vol_tb_ngay_top_tinh_giao : s3.avg_vol_tb_ngay;
+
                         const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
-                        const combinedDelivered = s1.total_delivered_vol + s2.total_delivered_vol + s3.total_delivered_vol;
                         const combinedOpr = combinedVol > 0 ? 
                             ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol) + (s3.weighted_opr * s3.total_vol)) / combinedVol : 0;
                         const combinedRotLc = combinedVol > 0 ? 
                             ((s1.weighted_rot_lc * s1.total_vol) + (s2.weighted_rot_lc * s2.total_vol) + (s3.weighted_rot_lc * s3.total_vol)) / combinedVol : 0;
-                        const combinedOdr = combinedDelivered > 0 ? 
-                            ((s1.weighted_odr * s1.total_delivered_vol) + (s2.weighted_odr * s2.total_delivered_vol) + (s3.weighted_odr * s3.total_delivered_vol)) / combinedDelivered : 0;
-                        const combinedLongtail = combinedDelivered > 0 ? 
-                            ((s1.weighted_longtail * s1.total_delivered_vol) + (s2.weighted_longtail * s2.total_delivered_vol) + (s3.weighted_longtail * s3.total_delivered_vol)) / combinedDelivered : 0;
-                        const combinedKlTbNgay = s1.avg_kl_tb_ngay + s2.avg_kl_tb_ngay + s3.avg_kl_tb_ngay;
+                        const combinedOdr = combinedVol > 0 ? 
+                            ((s1.weighted_odr * s1.total_vol) + (s2.weighted_odr * s2.total_vol) + (s3.weighted_odr * s3.total_vol)) / combinedVol : 0;
+                        const combinedLongtail = combinedVol > 0 ? 
+                            ((s1.weighted_longtail * s1.total_vol) + (s2.weighted_longtail * s2.total_vol) + (s3.weighted_longtail * s3.total_vol)) / combinedVol : 0;
 
-                        recommendations.push({
+                        groupSuggestions.push({
+                            is_single: false,
                             quan,
                             warehouse_name: whName,
                             flow_type: flowVal,
                             KTC: ktcDest,
                             shops: [s1, s2, s3],
-                            combined_vol_tb_ngay: s1.avg_vol_tb_ngay + s2.avg_vol_tb_ngay + s3.avg_vol_tb_ngay,
-                            combined_kl_tb_ngay: combinedKlTbNgay,
+                            combined_vol_tb_ngay: v1 + v2 + v3,
+                            combined_kl_tb_ngay: w1 + w2 + w3,
                             combined_vol: combinedVol,
-                            combined_delivered_vol: combinedDelivered,
                             combined_opr: combinedOpr,
                             combined_rot_lc: combinedRotLc,
                             combined_odr: combinedOdr,
@@ -1444,12 +1377,23 @@ function calculateShopGroups() {
         }
     });
 
-    recommendations.sort((a, b) => b.combined_kl_tb_ngay - a.combined_kl_tb_ngay);
+    // 3. Combine both direct single shops and group suggestions
+    const allRecommendations = [...singleShopSuggestions, ...groupSuggestions];
 
-    // Greedy: each shop appears in AT MOST ONE group
+    // Sort: prioritizes direct KTC đầu giao (Luồng 2) first, then Luồng 1.
+    // Within each flow, sort by weight descending!
+    allRecommendations.sort((a, b) => {
+        if (a.flow_type !== b.flow_type) {
+            // '2' goes first (Direct to KTC), '1' goes second
+            return b.flow_type.localeCompare(a.flow_type);
+        }
+        return b.combined_kl_tb_ngay - a.combined_kl_tb_ngay;
+    });
+
+    // 4. Greedy Selection: each shop appears in at most one suggestion
     const usedShopKeys = new Set();
-    const uniqueRecs = recommendations.filter(rec => {
-        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${rec.flow_type}|${rec.KTC}|${s.ten_kh}`);
+    const uniqueRecs = allRecommendations.filter(rec => {
+        const keys = rec.shops.map(s => `${rec.quan}|${rec.warehouse_name}|${rec.flow_type}|${s.ten_kh}`);
         if (keys.some(k => usedShopKeys.has(k))) return false;
         keys.forEach(k => usedShopKeys.add(k));
         return true;
@@ -1474,26 +1418,35 @@ function updateGroupingTab() {
 
     let filteredGroups = groups.filter(g => {
         if (g.combined_kl_tb_ngay < minWeight) return false;
+        if (groupSize === 'single' && !g.is_single) return false;
+        if (groupSize === 'group' && g.is_single) return false;
         if (groupSize === '2' && g.shops.length !== 2) return false;
         if (groupSize === '3' && g.shops.length !== 3) return false;
         if (groupFlow !== 'all' && g.flow_type !== groupFlow) return false;
 
-        // Determine truck match
+        // Determine truck match based on logistics market rules
         let truckSize = 'Xe 1.9T';
         let truckWeightLimit = 1900;
         const w = g.combined_kl_tb_ngay;
-        if (w >= 8000) {
-            truckSize = 'Xe 8T';
-            truckWeightLimit = 8000;
-        } else if (w >= 5000) {
-            truckSize = 'Xe 5T';
-            truckWeightLimit = 5000;
-        } else if (w >= 2500) {
-            truckSize = 'Xe 2.5T';
-            truckWeightLimit = 2500;
+        
+        if (g.flow_type === '2') {
+            // Direct destination KTC uses 5T or 8T to optimize cost!
+            if (w >= 5000) {
+                truckSize = 'Xe 8T';
+                truckWeightLimit = 8000;
+            } else {
+                truckSize = 'Xe 5T';
+                truckWeightLimit = 5000;
+            }
         } else {
-            truckSize = 'Xe 1.9T';
-            truckWeightLimit = 1900;
+            // Origin KTC uses smaller trucks like 1.9T or 2.5T!
+            if (w >= 2500) {
+                truckSize = 'Xe 2.5T';
+                truckWeightLimit = 2500;
+            } else {
+                truckSize = 'Xe 1.9T';
+                truckWeightLimit = 1900;
+            }
         }
 
         if (groupTruck !== 'all' && truckSize !== `Xe ${groupTruck}`) return false;
@@ -1542,14 +1495,14 @@ function updateGroupingTab() {
         let statusBadge = '';
         if (g.combined_odr < 0.90 || g.combined_longtail > 0.08) {
             statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.2)); color: #f43f5e; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;">Cải Thiện SLA</span>';
-        } else if (g.combined_kl_tb_ngay >= 2000) {
-            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20, 184, 166, 0.2)); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Siêu Tiềm Năng</span>';
-        } else if (g.combined_kl_tb_ngay >= 1000) {
-            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.2)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Khả Thi Cao</span>';
+        } else if (g.combined_kl_tb_ngay >= 5000) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20, 184, 166, 0.2)); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Xe Đại Tải Tuyến</span>';
+        } else if (g.combined_kl_tb_ngay >= 1900) {
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(56, 189, 248, 0.2)); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Đủ Tải Xe Đơn</span>';
         } else if (g.combined_kl_tb_ngay >= 500) {
-            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 179, 8, 0.2)); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); font-weight: 600;">Tiềm Năng</span>';
+            statusBadge = '<span class="badge" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 179, 8, 0.2)); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); font-weight: 600;">Tiềm Năng Gom</span>';
         } else {
-            statusBadge = '<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);">Cần Nuôi Thêm</span>';
+            statusBadge = '<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2);">Cần Gom Thêm</span>';
         }
 
         // Render Routing Flow Badge
@@ -1571,14 +1524,19 @@ function updateGroupingTab() {
             let shopRotLcColor = s.weighted_rot_lc > 0.02 ? '#f43f5e' : '#14b8a6';
             let shopOdrColor = s.weighted_odr < 0.92 ? '#f43f5e' : '#14b8a6';
             let shopLongtailColor = s.weighted_longtail > 0.08 ? '#f43f5e' : '#14b8a6';
+            
+            // Routing weight is top province weight for flow 2, else total weight
+            const shopWeight = s.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
+            const shopVol = s.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
+            
             shopListHtml += `
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(51, 65, 85, 0.4); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(51, 65, 85, 0.6); white-space: nowrap;">
                     <div style="display: flex; flex-direction: column; text-align: left; gap: 0.1rem; flex-grow: 1; min-width: 0;">
                         <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${s.ten_kh}">${s.ten_kh}</span>
-                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Loại: ${s.loai_kh} | KL: ${s.avg_kl_tb_ngay.toFixed(1)} Kg/n</span>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Loại: ${s.loai_kh} | KL Tuyến: ${shopWeight.toFixed(1)} Kg/n</span>
                     </div>
                     <div style="display: flex; gap: 0.3rem; flex-shrink: 0; align-items: center;">
-                        <span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">${formatNumber(s.avg_vol_tb_ngay)} đơn</span>
+                        <span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">${formatNumber(shopVol)} đơn</span>
                         <span class="badge" style="background-color: rgba(239, 68, 68, 0.15); color: ${shopRotLcColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">Rớt: ${formatPercent(s.weighted_rot_lc)}</span>
                         <span class="badge" style="background-color: rgba(20, 184, 166, 0.15); color: ${shopOprColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">OPR: ${formatPercent(s.weighted_opr)}</span>
                         <span class="badge" style="background-color: rgba(20, 184, 166, 0.15); color: ${shopOdrColor}; font-family: monospace; font-size: 0.72rem; padding: 0.15rem 0.4rem;">ODR: ${formatPercent(s.weighted_odr)}</span>
@@ -1589,22 +1547,27 @@ function updateGroupingTab() {
         });
         shopListHtml += '</div>';
 
-        // Calculate Truck Optimization Visuals
+        // Calculate Truck Optimization Visuals based on dynamically assigned truck capacities
         let truckSize = 'Xe 1.9T';
         let truckWeightLimit = 1900;
         const w = g.combined_kl_tb_ngay;
-        if (w >= 8000) {
-            truckSize = 'Xe 8T';
-            truckWeightLimit = 8000;
-        } else if (w >= 5000) {
-            truckSize = 'Xe 5T';
-            truckWeightLimit = 5000;
-        } else if (w >= 2500) {
-            truckSize = 'Xe 2.5T';
-            truckWeightLimit = 2500;
+        
+        if (g.flow_type === '2') {
+            if (w >= 5000) {
+                truckSize = 'Xe 8T';
+                truckWeightLimit = 8000;
+            } else {
+                truckSize = 'Xe 5T';
+                truckWeightLimit = 5000;
+            }
         } else {
-            truckSize = 'Xe 1.9T';
-            truckWeightLimit = 1900;
+            if (w >= 2500) {
+                truckSize = 'Xe 2.5T';
+                truckWeightLimit = 2500;
+            } else {
+                truckSize = 'Xe 1.9T';
+                truckWeightLimit = 1900;
+            }
         }
 
         const utilizationPct = Math.min(100, (w / truckWeightLimit) * 100);
@@ -1649,11 +1612,15 @@ function updateGroupingTab() {
             </div>
         `;
 
+        const scaleBadge = g.is_single
+            ? `<span class="badge" style="background-color: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: bold;">Đi Thẳng Lẻ</span>`
+            : `<span class="badge" style="background-color: ${g.shops.length === 3 ? 'rgba(139, 92, 246, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; color: ${g.shops.length === 3 ? '#a78bfa' : '#38bdf8'}; font-weight: bold;">Gom ${g.shops.length} Shop</span>`;
+
         tr.innerHTML = `
             <td style="text-align: center;"><span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: ${idx === 0 ? 'rgba(234, 179, 8, 0.2)' : idx === 1 ? 'rgba(148, 163, 184, 0.2)' : 'rgba(115, 115, 115, 0.2)'}; color: ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : '#a3a3a3'}; font-weight: bold; font-size: 0.85rem; border: 1px solid ${idx === 0 ? '#facc15' : idx === 1 ? '#cbd5e1' : 'transparent'};">${idx + 1}</span></td>
             <td style="font-weight: 700; color: white;">${g.warehouse_name}</td>
             <td style="color: var(--text-muted); font-weight: 500;">${g.quan}</td>
-            <td style="text-align: center;"><span class="badge" style="background-color: ${g.shops.length === 3 ? 'rgba(139, 92, 246, 0.15)' : 'rgba(56, 189, 248, 0.15)'}; color: ${g.shops.length === 3 ? '#a78bfa' : '#38bdf8'}; font-weight: bold;">Gom ${g.shops.length} Shop</span></td>
+            <td style="text-align: center;">${scaleBadge}</td>
             <td style="text-align: center; vertical-align: middle;">${flowBadge}</td>
             <td style="text-align: center; vertical-align: middle;">${ktcText}</td>
             <td>${shopListHtml}</td>

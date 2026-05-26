@@ -53,16 +53,7 @@
                     <div class="checkbox-list" id="filter-district"></div>
                 </div>
 
-                <div class="filter-group">
-                    <label>Nhóm Sản Lượng</label>
-                    <div class="checkbox-list" id="filter-volume">
-                        <label class="checkbox-item"><input type="checkbox" value="1. Duoi 100 don/ngay"> <span>Dưới 100 đơn/ngày</span></label>
-                        <label class="checkbox-item"><input type="checkbox" value="2. 100 - 300 don/ngay"> <span>100 - 300 đơn/ngày</span></label>
-                        <label class="checkbox-item"><input type="checkbox" value="3. 300 - 500 don/ngay"> <span>300 - 500 đơn/ngày</span></label>
-                        <label class="checkbox-item"><input type="checkbox" value="4. 500 - 1000 don/ngay"> <span>500 - 1000 đơn/ngày</span></label>
-                        <label class="checkbox-item"><input type="checkbox" value="5. Trên 1000 don/ngay"> <span>Trên 1000 đơn/ngày</span></label>
-                    </div>
-                </div>
+
 
                 <div class="filter-group">
                     <label>Mô Hình (KHL/BC)</label>
@@ -81,11 +72,7 @@
                     <div class="checkbox-list" id="filter-client-type"></div>
                 </div>
 
-                <div class="filter-group">
-                    <label>KTC Đầu Giao Gợi Ý</label>
-                    <input type="text" class="slicer-search" placeholder="Tìm KTC..." data-target="filter-ktc">
-                    <div class="checkbox-list" id="filter-ktc"></div>
-                </div>
+
 
                 <div class="filter-group">
                     <label>Luồng Vận Hành</label>
@@ -194,42 +181,13 @@
                     </div>
                 </div>
 
-                <!-- Group 4: Phân Luồng Vận Hành -->
-                <div class="metrics-group flow-group" style="background: linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border: 1px solid rgba(20, 184, 166, 0.3);">
-                    <h4><i class='bx bx-git-branch'></i> Luồng Vận Hành</h4>
-                    <div class="scorecards-subgrid col-2">
-                        <div class="card">
-                            <div class="card-icon flow2-icon" style="background-color: rgba(20, 184, 166, 0.1); color: var(--accent-teal);"><i class='bx bx-navigation'></i></div>
-                            <div class="card-info">
-                                <p>Đi Thẳng KTC (Luồng 2)</p>
-                                <h3 id="score-flow2-pct">0%</h3>
-                                <small style="color: var(--text-muted)" id="score-flow2-vol">0 đơn</small>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-icon flow1-icon" style="background-color: rgba(249, 115, 22, 0.1); color: var(--accent-orange);"><i class='bx bx-git-merge'></i></div>
-                            <div class="card-info">
-                                <p>Qua Sort Lấy (Luồng 1)</p>
-                                <h3 id="score-flow1-pct">0%</h3>
-                                <small style="color: var(--text-muted)" id="score-flow1-vol">0 đơn</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
             </div>
 
 
 
             <!-- Charts Section -->
             <section class="charts-grid">
-                <div class="chart-container span-2">
-                    <h3>Top 15 Shop Lớn Nhất (Cảnh Báo ODR < 92% hoặc Longtail > 8%)</h3>
-                    <div class="canvas-wrapper"><canvas id="chart-top-shops"></canvas></div>
-                </div>
-                <div class="chart-container">
-                    <h3>Phân Bổ Theo Nhóm</h3>
-                    <div class="canvas-wrapper"><canvas id="chart-shop-distribution"></canvas></div>
-                </div>
                 <div class="chart-container span-3">
                     <div class="chart-header">
                         <h3>Top Shop Cần Focus (Sản Lượng Cao & Hiệu Suất Thấp)</h3>
@@ -286,26 +244,25 @@
                                 <th>Loại KH</th>
                                 <th>Tổng Vol</th>
                                 <th>Tổng KL (Kg)</th>
-                                <th>Số Ngày Phái Sinh Đơn</th>
+                                <th>Số Ngày Phát Sinh Đơn</th>
                                 <th>Số Ngày > 1000 Đơn</th>
                                 <th>Vol TB/Ngày</th>
                                 <th>KL TB/Ngày (Kg)</th>
                                 <th>% Đơn < 5kg</th>
                                 <th>% Nội Vùng</th>
                                 <th>% Liên Vùng</th>
-                                <th>OPR</th>
                                 <th>% 0 - 9h</th>
                                 <th>% 9h - 19h</th>
                                 <th>% Sau 19h</th>
-                                <th>Đơn Giao TC</th>
+                                <th>OPR</th>
+                                <th>% Rớt LC</th>
                                 <th>ODR</th>
                                 <th>% Longtail</th>
-                                <th>% Rớt LC</th>
                                 <th>Tỉnh Giao Lớn Nhất</th>
                                 <th>% Tỉnh Giao Lớn Nhất</th>
-                                <th>Vol TB Tuyến Max</th>
+                                <th>KL TB/Ngày Tuyến Max (Kg)</th>
+                                <th>Vol TB/Ngày Tuyến Max</th>
                                 <th>Mã Đơn Mẫu</th>
-                                <th>KTC Đầu Giao Gợi Ý</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -318,14 +275,18 @@
 
             <div id="tab-grouping" class="tab-content">
                 <!-- Grouping Intro Card -->
-                <div class="grouping-intro-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(20, 184, 166, 0.05) 100%); border-left: 4px solid var(--accent-teal);">
+                <div class="grouping-intro-card" style="background: linear-gradient(135deg, rgba(20, 184, 166, 0.04) 0%, rgba(59, 130, 246, 0.04) 100%); border-left: 4px solid var(--accent-teal);">
                     <i class='bx bx-bulb' style="color: var(--accent-teal);"></i>
                     <div>
                         <h4>Giải Pháp Đề Xuất Phân Luồng & Gom Nhóm Tối Ưu Xe Tải</h4>
-                        <p>
-                            Hệ thống tự động phân tích dữ liệu thực tế để gợi ý phân phối theo 2 luồng vận hành chính: **Luồng 1 (Gom qua kho trung chuyển đầu lấy)** dành cho các shop có sản lượng đi tỉnh nhỏ lẻ, phân tán; **Luồng 2 (Đi thẳng KTC đầu giao)** dành cho các shop có sản lượng lớn đi chung một kho trung chuyển đầu giao (KTC).
-                            Đồng thời, hệ thống sẽ thực hiện ghép chéo các khách hàng trong **cùng Quận/Huyện** và **cùng thuộc Bưu cục lấy** để tối ưu hóa tải trọng của các xe tải: **Xe 1.9T (1900kg)**, **Xe 2.5T (2500kg)**, **Xe 5T (5000kg)** và **Xe 8T (8000kg)**.
+                        <p style="margin-top: 0.5rem; line-height: 1.6;">
+                            Hệ thống tự động phân tích dữ liệu thực tế để gợi ý phân phối và gán tải trọng xe thông minh theo đặc thù logistics Việt Nam:
                         </p>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem; line-height: 1.6; color: var(--text-muted); font-size: 0.9rem;">
+                            <li><strong style="color: #60a5fa;">Luồng 1 (Gom qua KTC đầu lấy):</strong> Dành cho sản lượng đi tỉnh nhỏ lẻ, phân tán. Hệ thống gán <strong>Xe 1.9T (1900kg)</strong> hoặc <strong>Xe 2.5T (2500kg)</strong>. Đây là các dòng xe tải nhẹ tiêu chuẩn giúp di chuyển thuận tiện trong nội đô vào ban ngày mà không lo vi phạm lệnh cấm tải nội đô (quy định cấm xe ≥ 2.5T chạy giờ hành chính).</li>
+                            <li><strong style="color: #4ade80;">Luồng 2 (Đi thẳng KTC đầu giao):</strong> Áp dụng cho các shop có sản lượng lớn chung tuyến max (tỷ trọng > 50%). Hệ thống chỉ định xe trung & đại tải cực kỳ kinh tế: <strong>Xe 5T (5000kg)</strong> hoặc <strong>Xe 8T (8000kg)</strong>. Giúp đi thẳng bỏ qua khâu sort trung gian tại đầu lấy, giảm OPR trễ và tối ưu chi phí vận chuyển liên vùng.</li>
+                            <li><strong style="color: #facc15;">Đi Thẳng Lẻ (Không Gom):</strong> Bất kỳ shop nào có khối lượng trung bình ngày đủ lớn (<strong>≥ 1000 Kg</strong>) sẽ được tự động xếp xe đi riêng thẳng trực tiếp, không tham gia gom nhóm để tránh phát sinh thời gian chờ đợi.</li>
+                        </ul>
                     </div>
                 </div>
 
@@ -347,7 +308,9 @@
                     <div style="min-width: 150px;">
                         <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Quy mô nhóm gom:</label>
                         <select id="grouping-size" style="width: 100%; padding: 0.5rem; background: var(--bg-panel); color: white; border: 1px solid var(--border-color); border-radius: 4px;">
-                            <option value="all">Tất cả (2 hoặc 3 Shop)</option>
+                            <option value="all">Tất cả các đề xuất</option>
+                            <option value="single">Đi Thẳng Lẻ (Không Gom)</option>
+                            <option value="group">Chỉ các nhóm gom</option>
                             <option value="2">Gom 2 Shop</option>
                             <option value="3">Gom 3 Shop</option>
                         </select>
