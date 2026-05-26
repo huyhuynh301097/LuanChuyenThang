@@ -25,6 +25,41 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
+// Robust decimal and float parser
+function parseSafeFloat(val) {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    let str = String(val).trim();
+    if (str === '' || str.toLowerCase() === 'nan' || str.toLowerCase() === 'null' || str === '-') return 0;
+    
+    // Check for percentages
+    if (str.endsWith('%')) {
+        return parseSafeFloat(str.slice(0, -1)) / 100;
+    }
+    
+    // Standard Vietnamese/German float format check: comma is decimal separator (e.g. 12,5)
+    // or standard English (comma thousands, dot decimal)
+    if (str.includes(',') && !str.includes('.')) {
+        str = str.replace(',', '.');
+    } else if (str.includes('.') && str.includes(',')) {
+        if (str.indexOf(',') < str.indexOf('.')) {
+            str = str.replace(/,/g, ''); // e.g. 1,234.56
+        } else {
+            str = str.replace(/\./g, '').replace(',', '.'); // e.g. 1.234,56
+        }
+    } else if (str.includes(',')) {
+        const parts = str.split(',');
+        if (parts[parts.length - 1].length === 3) {
+            str = str.replace(/,/g, '');
+        } else {
+            str = str.replace(',', '.');
+        }
+    }
+    
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+}
+
 // Load and Parse CSV Data
 function loadData() {
     console.log("Fetching live data from Google Sheets...");
@@ -34,23 +69,42 @@ function loadData() {
         dynamicTyping: true,
         complete: function(results) {
             console.log("Loaded data from Google Sheets successfully.");
-            processLoadedData(results.data);
+            
+            // Validate parsed rows to detect Google Sheets private/login HTML redirection
+            const firstRow = results.data ? results.data[0] : null;
+            let isValid = false;
+            if (firstRow) {
+                const keys = Object.keys(firstRow).map(k => k.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                isValid = keys.some(k => k.includes('warehouseid') || k.includes('tenkh') || k.includes('thang'));
+            }
+            
+            if (isValid) {
+                processLoadedData(results.data);
+            } else {
+                console.warn("Google Sheet parsed but does not contain valid columns. Falling back to local data.csv.");
+                loadLocalFallback();
+            }
         },
         error: function(err) {
             console.warn("Could not load from Google Sheets URL. Falling back to local data.csv.", err);
-            Papa.parse('data.csv', {
-                download: true,
-                header: true,
-                dynamicTyping: true,
-                complete: function(results) {
-                    console.log("Loaded data from local data.csv successfully.");
-                    processLoadedData(results.data);
-                },
-                error: function(localErr) {
-                    console.error("Local data fallback failed:", localErr);
-                    alert("Không thể tải dữ liệu từ Google Sheets hoặc local data.csv.");
-                }
-            });
+            loadLocalFallback();
+        }
+    });
+}
+
+function loadLocalFallback() {
+    console.log("Loading local fallback...");
+    Papa.parse('data.csv', {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        complete: function(results) {
+            console.log("Loaded data from local data.csv successfully.");
+            processLoadedData(results.data);
+        },
+        error: function(localErr) {
+            console.error("Local data fallback failed:", localErr);
+            alert("Không thể tải dữ liệu từ Google Sheets hoặc local data.csv.");
         }
     });
 }
@@ -59,10 +113,41 @@ function processLoadedData(parsedRows) {
     console.log("=== GHN CSV Loading Debug ===");
     console.log("Total raw lines parsed:", parsedRows ? parsedRows.length : 0);
     
-    rawData = parsedRows.filter(row => {
-        return row.warehouse_id !== null && row.warehouse_id !== undefined;
+    if (!parsedRows || parsedRows.length === 0) {
+        console.error("Parsed rows is empty!");
+        alert("Không tìm thấy dữ liệu phù hợp.");
+        return;
+    }
+
+    // Inspect columns of first row
+    console.log("First row raw keys:", Object.keys(parsedRows[0]));
+
+    // Clean keys of BOMs and whitespace
+    const cleanRows = parsedRows.map(row => {
+        if (!row) return null;
+        const cleanRow = {};
+        Object.keys(row).forEach(key => {
+            if (key) {
+                const cleanKey = key.replace(/^\ufeff/, '').trim();
+                cleanRow[cleanKey] = row[key];
+            }
+        });
+        return cleanRow;
+    }).filter(row => row !== null);
+
+    console.log("Cleaned rows count:", cleanRows.length);
+    if (cleanRows.length > 0) {
+        console.log("Cleaned keys of first row:", Object.keys(cleanRows[0]));
+    }
+
+    // Filter valid rows: check if there's any key indicating a non-empty row.
+    rawData = cleanRows.filter(row => {
+        const whId = row.warehouse_id !== null && row.warehouse_id !== undefined && String(row.warehouse_id).trim() !== '';
+        const whName = row.warehouse_name !== null && row.warehouse_name !== undefined && String(row.warehouse_name).trim() !== '';
+        const shop = row.ten_kh !== null && row.ten_kh !== undefined && String(row.ten_kh).trim() !== '';
+        return whId || whName || shop;
     }).map(row => {
-        const volTbNgay = row.vol_tb_ngay || 0;
+        const volTbNgay = parseSafeFloat(row.vol_tb_ngay);
         let nhomSanLuong = '';
         
         if (volTbNgay < 100) {
@@ -84,40 +169,64 @@ function processLoadedData(parsedRows) {
         // Shop belongs to Flow 2 if it has a suggested KTC and high concentration (pct_top_tinh_giao >= 0.10)
         // Otherwise, it goes to Flow 1
         const hasKtc = row.KTC && String(row.KTC).trim() !== "" && String(row.KTC).toLowerCase() !== "nan" && String(row.KTC).toLowerCase() !== "null";
-        const flowType = (hasKtc && (row.pct_top_tinh_giao || 0) > 0.50) ? '2' : '1';
+        const flowType = (hasKtc && parseSafeFloat(row.pct_top_tinh_giao) > 0.50) ? '2' : '1';
 
         // Compatibility mapping
-        const kl = row.kl !== undefined ? row.kl : (row['kl(kg)'] || 0);
-        const soNgay = row.so_ngay !== undefined ? row.so_ngay : (row.so_ngay_phat_sinh_don || 0);
-        const soNgay1000 = row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : (row.so_ngay_tren_1000_don || 0);
-        const klTbNgay = row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : (row['kl_tb_ngay(kg)'] || 0);
-        const pctDuoi5kg = row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : (row.pct_don_duoi_5kg || 0);
-        const pctNoiVung = row.pct_noi_vung !== undefined ? row.pct_noi_vung : (row.pct_don_noi_vung || 0);
-        const pctLienVung = row.pct_lien_vung !== undefined ? row.pct_don_lien_vung : (row.pct_don_lien_vung || 0);
+        const klParsed = parseSafeFloat(row.kl !== undefined ? row.kl : row['kl(kg)']);
+        const soNgayParsed = parseSafeFloat(row.so_ngay !== undefined ? row.so_ngay : row.so_ngay_phat_sinh_don);
+        const soNgay1000Parsed = parseSafeFloat(row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : row.so_ngay_tren_1000_don);
+        const klTbNgayParsed = parseSafeFloat(row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : row['kl_tb_ngay(kg)']);
+        const pctDuoi5kgParsed = parseSafeFloat(row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : row.pct_don_duoi_5kg);
+        const pctNoiVungParsed = parseSafeFloat(row.pct_noi_vung !== undefined ? row.pct_noi_vung : row.pct_don_noi_vung);
+        const pctLienVungParsed = parseSafeFloat(row.pct_lien_vung !== undefined ? row.pct_lien_vung : row.pct_don_lien_vung);
 
         return {
             ...row,
             nhom_san_luong: nhomSanLuong,
             hub_type: hubType,
             flow_type: flowType,
-            vol: row.vol || 0,
-            'kl(kg)': kl,
-            so_ngay_phat_sinh_don: soNgay,
-            so_ngay_tren_1000_don: soNgay1000,
-            'kl_tb_ngay(kg)': klTbNgay,
-            pct_don_duoi_5kg: pctDuoi5kg,
-            pct_don_noi_vung: pctNoiVung,
-            pct_don_lien_vung: pctLienVung,
-            pct_opr: row.pct_opr || 0,
-            pct_rot_lc: row.pct_rot_lc || 0,
-            vol_delivered: row.vol_delivered || 0,
-            pct_odr: row.pct_odr || 0,
-            pct_longtail: row.pct_longtail || 0,
+            vol: parseSafeFloat(row.vol),
+            'kl(kg)': klParsed,
+            so_ngay_phat_sinh_don: soNgayParsed,
+            so_ngay_tren_1000_don: soNgay1000Parsed,
+            'kl_tb_ngay(kg)': klTbNgayParsed,
+            pct_don_duoi_5kg: pctDuoi5kgParsed,
+            pct_don_noi_vung: pctNoiVungParsed,
+            pct_don_lien_vung: pctLienVungParsed,
+            pct_opr: parseSafeFloat(row.pct_opr),
+            pct_gio_0_9: parseSafeFloat(row.pct_gio_0_9),
+            pct_gio_9_19: parseSafeFloat(row.pct_gio_9_19),
+            pct_gio_19p: parseSafeFloat(row.pct_gio_19p),
+            pct_rot_lc: parseSafeFloat(row.pct_rot_lc),
+            vol_delivered: parseSafeFloat(row.vol_delivered),
+            pct_odr: parseSafeFloat(row.pct_odr),
+            pct_longtail: parseSafeFloat(row.pct_longtail),
             KTC: hasKtc ? String(row.KTC).trim() : 'Không rõ',
             top_tinh_giao: row.top_tinh_giao || 'Không rõ',
-            pct_top_tinh_giao: row.pct_top_tinh_giao || 0,
-            vol_tb_ngay_top_tinh_giao: row.vol_tb_ngay_top_tinh_giao || 0,
-            loai_kh: row.loai_kh || 'Chưa phân loại'
+            pct_top_tinh_giao: parseSafeFloat(row.pct_top_tinh_giao),
+            vol_tb_ngay_top_tinh_giao: parseSafeFloat(row.vol_tb_ngay_top_tinh_giao),
+            loai_kh: row.loai_kh || 'Chưa phân loại',
+            
+            // Normalized properties to avoid key mismatch
+            thang: row.thang ? String(row.thang).trim() : '',
+            vung: row.vung ? String(row.vung).trim() : '',
+            tinh: row.tinh ? String(row.tinh).trim() : '',
+            quan: row.quan ? String(row.quan).trim() : '',
+            warehouse_id: row.warehouse_id ? String(row.warehouse_id).trim() : '',
+            warehouse_name: row.warehouse_name ? String(row.warehouse_name).trim() : '',
+            client_id: row.client_id ? String(row.client_id).trim() : '',
+            shop_id: row.shop_id ? String(row.shop_id).trim() : '',
+            ten_kh: row.ten_kh ? String(row.ten_kh).trim() : '',
+            order_code_mau: row.order_code_mau ? String(row.order_code_mau).trim() : '',
+            
+            // For older script templates compatibility
+            vol_tb_ngay: volTbNgay,
+            kl_tb_ngay: klTbNgayParsed,
+            pct_duoi_5kg: pctDuoi5kgParsed,
+            pct_noi_vung: pctNoiVungParsed,
+            pct_lien_vung: pctLienVungParsed,
+            so_ngay: soNgayParsed,
+            so_ngay_tren_1000: soNgay1000Parsed
         };
     });
 
@@ -307,13 +416,47 @@ function applyFilters() {
 
 // Update Entire Dashboard
 function updateDashboard() {
-    updateScorecards();
-    renderCharts();
-    updateTable();
-    generateAlerts();
-    renderHeatmaps();
-    updateTrendShopOptions();
-    updateGroupingTab();
+    try {
+        updateScorecards();
+    } catch (e) {
+        console.error("Error in updateScorecards:", e);
+    }
+    
+    try {
+        renderCharts();
+    } catch (e) {
+        console.error("Error in renderCharts:", e);
+    }
+    
+    try {
+        updateTable();
+    } catch (e) {
+        console.error("Error in updateTable:", e);
+    }
+    
+    try {
+        generateAlerts();
+    } catch (e) {
+        console.error("Error in generateAlerts:", e);
+    }
+    
+    try {
+        renderHeatmaps();
+    } catch (e) {
+        console.error("Error in renderHeatmaps:", e);
+    }
+    
+    try {
+        updateTrendShopOptions();
+    } catch (e) {
+        console.error("Error in updateTrendShopOptions:", e);
+    }
+    
+    try {
+        updateGroupingTab();
+    } catch (e) {
+        console.error("Error in updateGroupingTab:", e);
+    }
 }
 
 // Formatter Helpers
