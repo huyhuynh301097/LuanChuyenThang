@@ -923,7 +923,17 @@ function renderShopDistributionChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                     // Update Detailed Data Table
+                            return ` ${context.raw} Shop`;
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+}
+
+// Update Detailed Data Table
 function updateTable() {
     const tbody = document.querySelector('#details-table tbody');
     tbody.innerHTML = '';
