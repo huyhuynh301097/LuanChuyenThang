@@ -283,9 +283,9 @@
                             Hệ thống tự động phân tích dữ liệu thực tế để gợi ý phân phối và gán tải trọng xe thông minh theo đặc thù logistics Việt Nam:
                         </p>
                         <ul style="margin-left: 1.5rem; margin-top: 0.5rem; line-height: 1.6; color: var(--text-muted); font-size: 0.9rem;">
-                            <li><strong style="color: #60a5fa;">Luồng 1 (Gom qua KTC đầu lấy):</strong> Dành cho sản lượng đi tỉnh nhỏ lẻ, phân tán. Hệ thống gán <strong>Xe 1.9T (1900kg)</strong> hoặc <strong>Xe 2.5T (2500kg)</strong>. Đây là các dòng xe tải nhẹ tiêu chuẩn giúp di chuyển thuận tiện trong nội đô vào ban ngày mà không lo vi phạm lệnh cấm tải nội đô (quy định cấm xe ≥ 2.5T chạy giờ hành chính).</li>
-                            <li><strong style="color: #4ade80;">Luồng 2 (Đi thẳng KTC đầu giao):</strong> Áp dụng cho các shop có sản lượng lớn chung tuyến max (tỷ trọng > 50%). Hệ thống chỉ định xe trung & đại tải cực kỳ kinh tế: <strong>Xe 5T (5000kg)</strong> hoặc <strong>Xe 8T (8000kg)</strong>. Giúp đi thẳng bỏ qua khâu sort trung gian tại đầu lấy, giảm OPR trễ và tối ưu chi phí vận chuyển liên vùng.</li>
-                            <li><strong style="color: #facc15;">Đi Thẳng Lẻ (Không Gom):</strong> Bất kỳ shop nào có khối lượng trung bình ngày đủ lớn (<strong>≥ 1000 Kg</strong>) sẽ được tự động xếp xe đi riêng thẳng trực tiếp, không tham gia gom nhóm để tránh phát sinh thời gian chờ đợi.</li>
+                            <li><strong style="color: #60a5fa;">Luồng 1 (Gom qua KTC đầu lấy):</strong> Áp dụng cho các shop có sản lượng đi tỉnh nhỏ lẻ, phân tán (tỷ trọng về tỉnh giao lớn nhất ≤ 30%). Hệ thống gán <strong>Xe 1.9T (1900kg)</strong> hoặc <strong>Xe 2.5T (2500kg)</strong> làm xe trung chuyển tiêu chuẩn tránh giờ cấm tải đô thị.</li>
+                            <li><strong style="color: #4ade80;">Luồng 2 (Đi thẳng KTC đầu giao):</strong> Áp dụng cho các shop có sản lượng lớn đi về cùng một tỉnh (tỷ trọng về tỉnh đó > 30%). Hệ thống chỉ định xe trung & đại tải hiệu suất cao: <strong>Xe 5T (5000kg)</strong> hoặc <strong>Xe 8T (8000kg)</strong> để tối ưu chi phí luân chuyển trực tiếp giữa các vùng.</li>
+                            <li><strong style="color: #facc15;">Shop Đi Riêng (Xe Đơn):</strong> Bất kỳ shop nào có khối lượng trung bình ngày đi thẳng đủ lớn (<strong>≥ 5000 kg đối với Luồng 2</strong> và <strong>≥ 1900 kg đối với Luồng 1</strong>) sẽ được tự động xếp đi một xe tải riêng lẻ độc lập mà không cần gom nhóm.</li>
                         </ul>
                     </div>
                 </div>
@@ -362,8 +362,8 @@
                                     <th style="text-align: center; width: 100px;">Luồng Gợi Ý</th>
                                     <th style="text-align: center; width: 100px;">KTC Đầu Giao</th>
                                     <th style="min-width: 520px;">Danh Sách Shop Gom Nhóm (Sản Lượng, OPR & SLA, Trọng Lượng)</th>
-                                    <th style="text-align: right; width: 140px;">Tổng Vol Gom/Ngày</th>
-                                    <th style="text-align: right; width: 140px;">Tổng KL Gom/Ngày (Kg)</th>
+                                    <th style="text-align: right; width: 140px;">Đơn TB/Ngày Gom</th>
+                                    <th style="text-align: right; width: 140px;">KL TB/Ngày Gom (Kg)</th>
                                     <th style="text-align: right; width: 160px;">Hiệu Suất Xe Tải</th>
                                     <th style="text-align: center; width: 110px;">% Rớt LC Nhóm</th>
                                     <th style="text-align: center; width: 110px;">OPR TB Nhóm</th>

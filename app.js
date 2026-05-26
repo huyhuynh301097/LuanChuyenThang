@@ -163,11 +163,11 @@ function processLoadedData(parsedRows) {
         const hubName = row.warehouse_name || '';
         const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
 
-        // Routing Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if pct_top_tinh_giao > 50%
-        const flowType = (parseSafeFloat(row.pct_top_tinh_giao) > 0.50) ? '2' : '1';
+        // Routing Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if pct_top_tinh_giao > 30%
+        const flowType = (parseSafeFloat(row.pct_top_tinh_giao) > 0.30) ? '2' : '1';
 
-        // Destination hub is top_tinh_giao for Flow 2
-        const ktcDest = flowType === '2' ? (row.top_tinh_giao || 'Không rõ') : 'KTC Đầu Lấy';
+        // Destination hub is KTC column, falling back to top_tinh_giao
+        const ktcDest = row.KTC || row.top_tinh_giao || 'Không rõ';
 
         // Compatibility mapping
         const klParsed = parseSafeFloat(row.kl !== undefined ? row.kl : row['kl(kg)']);
@@ -206,7 +206,7 @@ function processLoadedData(parsedRows) {
             pct_odr: parseSafeFloat(row.pct_odr),
             pct_longtail: parseSafeFloat(row.pct_longtail),
             KTC: ktcDest,
-            top_tinh_giao: row.top_tinh_giao || 'Không rõ',
+            top_tinh_giao: row.top_tinh_giao || row.KTC || 'Không rõ',
             pct_top_tinh_giao: parseSafeFloat(row.pct_top_tinh_giao),
             kl_tb_ngay_top_tinh_giao: parseSafeFloat(row.kl_tb_ngay_top_tinh_giao),
             vol_tb_ngay_top_tinh_giao: parseSafeFloat(row.vol_tb_ngay_top_tinh_giao),
@@ -1207,11 +1207,11 @@ function calculateShopGroups() {
         const weightedOdr = s.total_vol > 0 ? (s.odr_vol_sum / s.total_vol) : 0;
         const weightedLongtail = s.total_vol > 0 ? (s.longtail_vol_sum / s.total_vol) : 0;
         
-        // Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if top province ratio > 50%
-        const flowType = (avgPctTopTinhGiao > 0.50) ? '2' : '1';
+        // Flow Categorization: Luồng 2 (Đi thẳng KTC đầu giao) if top province ratio > 30%
+        const flowType = (avgPctTopTinhGiao > 0.30) ? '2' : '1';
         
-        // Destination label
-        const ktcDest = flowType === '2' ? s.top_tinh_giao : 'KTC Đầu Lấy';
+        // KTC destination is always top_tinh_giao
+        const ktcDest = s.top_tinh_giao || 'Không rõ';
 
         return {
             ten_kh: s.ten_kh,
@@ -1240,13 +1240,14 @@ function calculateShopGroups() {
 
     // Separate shops into Direct Dispatch (Single Shop) or Grouping Candidates
     shopsList.forEach(s => {
-        // Threshold for single shop to go alone: 1000 kg (1 Ton)
-        // For Luồng 2: based on kl_tb_ngay_top_tinh_giao
-        // For Luồng 1: based on avg_kl_tb_ngay
+        // Single shop goes alone if:
+        // - Luồng 2: top province weight kl_tb_ngay_top_tinh_giao >= 5000 kg (Xe 5T payload)
+        // - Luồng 1: total weight avg_kl_tb_ngay >= 1900 kg (Xe 1.9T payload)
         const weightForRouting = s.flow_type === '2' ? s.kl_tb_ngay_top_tinh_giao : s.avg_kl_tb_ngay;
         const volForRouting = s.flow_type === '2' ? s.vol_tb_ngay_top_tinh_giao : s.avg_vol_tb_ngay;
+        const singleThreshold = s.flow_type === '2' ? 5000 : 1900;
         
-        if (weightForRouting >= 1000) {
+        if (weightForRouting >= singleThreshold) {
             // Can go alone!
             singleShopSuggestions.push({
                 is_single: true,
