@@ -629,7 +629,7 @@ th, td {
 }
 
 th {
-    background-color: rgba(15, 23, 42, 0.4);
+    background-color: #172135; /* Solid dark background to prevent transparent scrolling text overlap */
     font-size: 0.75rem;
     text-transform: uppercase;
     color: var(--text-muted);
@@ -811,6 +811,11 @@ tbody tr.danger-row:hover {
 #grouping-size:focus, #grouping-search:focus {
     border-color: var(--accent-blue);
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
+}
+
+#details-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
 }
 
 /* Sticky Columns in Raw Data Table: Tên Khách Hàng (Col 9) & Loại KH (Col 10) */
