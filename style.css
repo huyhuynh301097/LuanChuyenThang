@@ -813,16 +813,39 @@ tbody tr.danger-row:hover {
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
 }
 
-/* Compact Shop Name Column in Raw Data Table */
-#details-table th:nth-child(9) {
-    max-width: 150px;
-    white-space: normal !important; /* Allow header text to wrap so it stays narrow! */
-    word-break: break-word;
-}
-
+/* Sticky Columns in Raw Data Table: Tên Khách Hàng (Col 9) & Loại KH (Col 10) */
+#details-table th:nth-child(9),
 #details-table td:nth-child(9) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: var(--bg-panel) !important;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
     max-width: 150px;
     width: 150px;
+}
+
+#details-table th:nth-child(9) {
+    background-color: #172135 !important;
+    white-space: normal !important; /* Allow header text to wrap */
+    word-break: break-word;
+    z-index: 15;
+}
+
+#details-table th:nth-child(10),
+#details-table td:nth-child(10) {
+    position: sticky;
+    left: 198px; /* Col 9 width (150px) + Col 9 padding (48px) = 198px */
+    z-index: 10;
+    background-color: var(--bg-panel) !important;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+#details-table th:nth-child(10) {
+    background-color: #172135 !important;
+    z-index: 15;
 }
 
 .shop-name-cell {
@@ -831,6 +854,23 @@ tbody tr.danger-row:hover {
     text-overflow: ellipsis;
     white-space: nowrap;
     display: block;
+}
+
+/* Maintain hover background colors for sticky columns */
+#details-table tr:hover td:nth-child(9),
+#details-table tr:hover td:nth-child(10) {
+    background-color: var(--bg-panel-hover) !important;
+}
+
+/* Danger rows theme support for sticky columns */
+#details-table tr.danger-row td:nth-child(9),
+#details-table tr.danger-row td:nth-child(10) {
+    background-color: #272235 !important;
+}
+
+#details-table tr.danger-row:hover td:nth-child(9),
+#details-table tr.danger-row:hover td:nth-child(10) {
+    background-color: #382945 !important;
 }
 
 /* Custom Weight Slider Styling */
