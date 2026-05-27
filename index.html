@@ -72,7 +72,11 @@
                     <div class="checkbox-list" id="filter-client-type"></div>
                 </div>
 
-
+                <div class="filter-group">
+                    <label>Phân Khúc Volume</label>
+                    <input type="text" class="slicer-search" placeholder="Tìm phân khúc..." data-target="filter-volume-segment">
+                    <div class="checkbox-list" id="filter-volume-segment"></div>
+                </div>
 
                 <div class="filter-group">
                     <label>Luồng Vận Hành</label>
@@ -206,6 +210,32 @@
                         </select>
                     </div>
                     <div class="canvas-wrapper"><canvas id="chart-shop-trend"></canvas></div>
+                </div>
+            </section>
+
+            <!-- Volume Segments Section -->
+            <section class="volume-segments-section">
+                <h3><i class='bx bx-pie-chart-alt' style="color: var(--accent-blue); font-size: 1.3rem; vertical-align: middle; margin-right: 0.5rem;"></i> Phân Khúc Shop Theo Sản Lượng (Volume)</h3>
+                <div class="volume-grid">
+                    <div class="table-responsive">
+                        <table id="volume-breakdown-table" class="heatmap-table">
+                            <thead>
+                                <tr>
+                                    <th>Phân Khúc Sản Lượng (Volume)</th>
+                                    <th style="text-align: right;">Số Lượng Shop</th>
+                                    <th style="text-align: right;">Tổng Sản Lượng (Đơn)</th>
+                                    <th style="text-align: right;">Tổng Khối Lượng (Kg)</th>
+                                    <th style="text-align: center;">Tỷ Lệ Shop (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="volume-bars-container" id="volume-bars-container">
+                        <!-- Dynamic bars showing visual percentage breakdown -->
+                    </div>
                 </div>
             </section>
 

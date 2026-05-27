@@ -958,4 +958,51 @@ tbody tr.danger-row:hover {
     vertical-align: middle;
 }
 
+/* Volume Segments Section styling */
+.volume-segments-section {
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.volume-segments-section h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.volume-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.volume-bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    padding: 1.5rem;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.volume-bar-item {
+    transition: transform 0.2s ease;
+}
+
+.volume-bar-item:hover {
+    transform: translateX(4px);
+}
+
+@media (max-width: 1200px) {
+    .volume-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+}
+
 

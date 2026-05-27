@@ -14,7 +14,8 @@ const filters = {
     hubType: new Set(),
     hub: new Set(),
     clientType: new Set(),
-    flow: new Set()
+    flow: new Set(),
+    volumeSegment: new Set()
 };
 
 // Initialize Application
@@ -244,6 +245,7 @@ function initializeFilters() {
     populateCheckboxes('filter-hub-type', ['KHL', 'Bưu Cục']);
     populateCheckboxes('filter-hub', [...new Set(rawData.map(d => d.warehouse_name).filter(Boolean))].sort());
     populateCheckboxes('filter-client-type', [...new Set(rawData.map(d => d.loai_kh).filter(Boolean))].sort());
+    populateCheckboxes('filter-volume-segment', [...new Set(rawData.map(d => d.nhom_san_luong).filter(Boolean))].sort());
 }
 
 function populateCheckboxes(elementId, options) {
@@ -277,7 +279,8 @@ function setupEventListeners() {
         { id: 'filter-hub-type', prop: 'hubType' },
         { id: 'filter-hub', prop: 'hub' },
         { id: 'filter-client-type', prop: 'clientType' },
-        { id: 'filter-flow', prop: 'flow' }
+        { id: 'filter-flow', prop: 'flow' },
+        { id: 'filter-volume-segment', prop: 'volumeSegment' }
     ];
 
     selectIds.forEach(({ id, prop }) => {
@@ -401,9 +404,10 @@ function applyFilters() {
         // New filters
         const matchClient = filters.clientType.size === 0 || filters.clientType.has(row.loai_kh);
         const matchFlow = filters.flow.size === 0 || filters.flow.has(row.flow_type);
+        const matchVolumeSegment = filters.volumeSegment.size === 0 || filters.volumeSegment.has(row.nhom_san_luong);
 
         return matchMonth && matchRegion && matchProvince && matchDistrict && 
-               matchHubType && matchHub && matchClient && matchFlow;
+               matchHubType && matchHub && matchClient && matchFlow && matchVolumeSegment;
     });
 
     updateDashboard();
@@ -451,6 +455,12 @@ function updateDashboard() {
         updateGroupingTab();
     } catch (e) {
         console.error("Error in updateGroupingTab:", e);
+    }
+    
+    try {
+        updateVolumeBreakdown();
+    } catch (e) {
+        console.error("Error in updateVolumeBreakdown:", e);
     }
 }
 
@@ -1650,5 +1660,85 @@ function updateGroupingTab() {
             <td style="text-align: center; vertical-align: middle;">${statusBadge}</td>
         `;
         table.appendChild(tr);
+    });
+}
+
+function updateVolumeBreakdown() {
+    const tbody = document.querySelector('#volume-breakdown-table tbody');
+    const barsContainer = document.getElementById('volume-bars-container');
+    if (!tbody || !barsContainer) return;
+    
+    tbody.innerHTML = '';
+    barsContainer.innerHTML = '';
+    
+    const segments = [
+        '1. Duoi 100 don/ngay',
+        '2. 100 - 300 don/ngay',
+        '3. 300 - 500 don/ngay',
+        '4. 500 - 1000 don/ngay',
+        '5. Trên 1000 don/ngay'
+    ];
+    
+    const counts = {};
+    segments.forEach(seg => {
+        counts[seg] = {
+            segment: seg,
+            shopCount: 0,
+            totalVol: 0,
+            totalWeight: 0
+        };
+    });
+    
+    let totalFilteredShops = 0;
+    filteredData.forEach(row => {
+        const seg = row.nhom_san_luong;
+        if (counts[seg]) {
+            counts[seg].shopCount++;
+            counts[seg].totalVol += row.vol || 0;
+            counts[seg].totalWeight += row['kl(kg)'] || 0;
+            totalFilteredShops++;
+        }
+    });
+    
+    segments.forEach(seg => {
+        const data = counts[seg];
+        const pct = totalFilteredShops > 0 ? (data.shopCount / totalFilteredShops) : 0;
+        
+        const shopCountStr = formatNumber(data.shopCount);
+        const totalVolStr = formatNumber(data.totalVol);
+        const totalWeightStr = formatNumber(data.totalWeight);
+        const pctStr = formatPercent(pct);
+        
+        let badgeColor = '';
+        let barBgColor = '';
+        if (seg.startsWith('1')) { badgeColor = 'rgba(148, 163, 184, 0.15); color: #94a3b8;'; barBgColor = '#94a3b8'; }
+        else if (seg.startsWith('2')) { badgeColor = 'rgba(59, 130, 246, 0.15); color: #60a5fa;'; barBgColor = '#3b82f6'; }
+        else if (seg.startsWith('3')) { badgeColor = 'rgba(20, 184, 166, 0.15); color: #2dd4bf;'; barBgColor = '#14b8a6'; }
+        else if (seg.startsWith('4')) { badgeColor = 'rgba(168, 85, 247, 0.15); color: #c084fc;'; barBgColor = '#a855f7'; }
+        else { badgeColor = 'rgba(239, 68, 68, 0.15); color: #f87171;'; barBgColor = '#ef4444'; }
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="badge" style="${badgeColor} font-weight: 600;">${seg}</span></td>
+            <td style="text-align: right; font-weight: bold; color: white;">${shopCountStr}</td>
+            <td style="text-align: right; color: var(--accent-blue); font-weight: 500;">${totalVolStr}</td>
+            <td style="text-align: right; color: var(--accent-teal); font-weight: 500;">${totalWeightStr}</td>
+            <td style="text-align: center; font-weight: bold; color: #cbd5e1;">${pctStr}</td>
+        `;
+        tbody.appendChild(tr);
+        
+        const barDiv = document.createElement('div');
+        barDiv.className = 'volume-bar-item';
+        barDiv.style.cssText = 'display: flex; flex-direction: column; gap: 0.3rem;';
+        barDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+                <span style="font-weight: 500; color: #e2e8f0;">${seg}</span>
+                <span style="font-weight: bold; color: ${barBgColor};">${shopCountStr} shop (${pctStr})</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(51, 65, 85, 0.6); border-radius: 4px; overflow: hidden;">
+                <div style="width: ${pct * 100}%; height: 100%; background: ${barBgColor}; border-radius: 4px; transition: width 0.3s ease;"></div>
+            </div>
+        `;
+        barsContainer.appendChild(barDiv);
     });
 }
