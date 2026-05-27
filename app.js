@@ -2,6 +2,7 @@
 let rawData = [];
 let filteredData = [];
 let charts = {};
+let activeHeatmapRegion = 'all';
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Yaf-aMKXxZIrkFCI9RgN6cMNJaaW1PZ0e8up4Dv8Yx8/export?format=csv&gid=623910036';
 
@@ -161,6 +162,20 @@ function processLoadedData(parsedRows) {
             nhomSanLuong = '5. Trên 1000 don/ngay';
         }
 
+        const klTbNgayParsed = parseSafeFloat(row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : row['kl_tb_ngay(kg)']);
+        let nhomKhoiLuong = '';
+        if (klTbNgayParsed < 50) {
+            nhomKhoiLuong = '1. Dưới 50 kg/ngày';
+        } else if (klTbNgayParsed <= 200) {
+            nhomKhoiLuong = '2. 50 - 200 kg/ngày';
+        } else if (klTbNgayParsed <= 500) {
+            nhomKhoiLuong = '3. 200 - 500 kg/ngày';
+        } else if (klTbNgayParsed <= 1000) {
+            nhomKhoiLuong = '4. 500 - 1000 kg/ngày';
+        } else {
+            nhomKhoiLuong = '5. Trên 1000 kg/ngày';
+        }
+
         const hubName = row.warehouse_name || '';
         const hubType = hubName.toLowerCase().includes('key account') ? 'KHL' : 'Bưu Cục';
 
@@ -174,7 +189,6 @@ function processLoadedData(parsedRows) {
         const klParsed = parseSafeFloat(row.kl !== undefined ? row.kl : row['kl(kg)']);
         const soNgayParsed = parseSafeFloat(row.so_ngay !== undefined ? row.so_ngay : row.so_ngay_phat_sinh_don);
         const soNgay1000Parsed = parseSafeFloat(row.so_ngay_tren_1000 !== undefined ? row.so_ngay_tren_1000 : row.so_ngay_tren_1000_don);
-        const klTbNgayParsed = parseSafeFloat(row.kl_tb_ngay !== undefined ? row.kl_tb_ngay : row['kl_tb_ngay(kg)']);
         const pctDuoi5kgParsed = parseSafeFloat(row.pct_duoi_5kg !== undefined ? row.pct_duoi_5kg : row.pct_don_duoi_5kg);
         const pctNoiVungParsed = parseSafeFloat(row.pct_noi_vung !== undefined ? row.pct_noi_vung : row.pct_don_noi_vung);
         const pctLienVungParsed = parseSafeFloat(row.pct_lien_vung !== undefined ? row.pct_lien_vung : row.pct_don_lien_vung);
@@ -182,6 +196,7 @@ function processLoadedData(parsedRows) {
         return {
             ...row,
             nhom_san_luong: nhomSanLuong,
+            nhom_khoi_luong: nhomKhoiLuong,
             hub_type: hubType,
             flow_type: flowType,
             vol: parseSafeFloat(row.vol),
@@ -354,6 +369,18 @@ function setupEventListeners() {
             focusToggleContainer.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             renderFocusShopsChart();
+        });
+    }
+
+    // Segmentation Slicer Toggle (Khối Lượng vs Sản Lượng)
+    const segmentationToggle = document.getElementById('segmentation-toggle');
+    if (segmentationToggle) {
+        segmentationToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-toggle');
+            if (!btn) return;
+            segmentationToggle.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateVolumeBreakdown();
         });
     }
 
@@ -1041,14 +1068,16 @@ function generateAlerts() {
     // Empty function to remove alerts as requested by user
 }
 
-// Generate Heatmaps
+// Generate Heatmaps with Dynamic Region Tabs & Overview Comparisons
 function renderHeatmaps() {
     const container = document.getElementById('heatmap-container');
+    const tabsContainer = document.getElementById('heatmap-tabs');
     if (!container) return;
-    container.innerHTML = '';
 
-    // Group by Region then District
+    // 1. Group by Region then District
     const regions = {};
+    const regionAggregations = {}; // Keep high-level metrics for region comparison!
+    
     filteredData.forEach(row => {
         const r = row.vung || 'Khác';
         const d = row.quan || 'Unknown';
@@ -1067,10 +1096,177 @@ function renderHeatmaps() {
         regions[r][d].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
         regions[r][d].totalOdrVol += ((row.pct_odr || 0) * row.vol);
         regions[r][d].totalLongtailVol += ((row.pct_longtail || 0) * row.vol);
+
+        if (!regionAggregations[r]) {
+            regionAggregations[r] = {
+                vung: r,
+                vol: 0,
+                totalOprVol: 0,
+                totalRotLcVol: 0,
+                totalOdrVol: 0,
+                totalLongtailVol: 0,
+                districtsCount: 0
+            };
+        }
+        regionAggregations[r].vol += row.vol;
+        regionAggregations[r].totalOprVol += (row.pct_opr * row.vol);
+        regionAggregations[r].totalRotLcVol += ((row.pct_rot_lc || 0) * row.vol);
+        regionAggregations[r].totalOdrVol += ((row.pct_odr || 0) * row.vol);
+        regionAggregations[r].totalLongtailVol += ((row.pct_longtail || 0) * row.vol);
     });
 
-    Object.keys(regions).sort().forEach(r => {
+    // Populate districts count for each region summary
+    Object.keys(regions).forEach(r => {
+        if (regionAggregations[r]) {
+            regionAggregations[r].districtsCount = Object.keys(regions[r]).length;
+        }
+    });
+
+    const regionsList = Object.keys(regions).sort();
+
+    // Reset active tab if the active region is no longer available in filtered data
+    if (activeHeatmapRegion !== 'all' && !regionsList.includes(activeHeatmapRegion)) {
+        activeHeatmapRegion = 'all';
+    }
+
+    // 2. Render Tabs
+    if (tabsContainer) {
+        tabsContainer.innerHTML = '';
+        
+        // Add "All" tab
+        const totalFilteredVolume = filteredData.reduce((sum, row) => sum + row.vol, 0);
+        const allTab = document.createElement('button');
+        allTab.className = `heatmap-tab-btn ${activeHeatmapRegion === 'all' ? 'active' : ''}`;
+        allTab.innerHTML = `Tất Cả <span class="badge-count">${formatNumber(totalFilteredVolume)}</span>`;
+        allTab.addEventListener('click', () => {
+            activeHeatmapRegion = 'all';
+            renderHeatmaps();
+        });
+        tabsContainer.appendChild(allTab);
+
+        // Add individual region tabs
+        regionsList.forEach(r => {
+            const regVol = regionAggregations[r]?.vol || 0;
+            const regTab = document.createElement('button');
+            regTab.className = `heatmap-tab-btn ${activeHeatmapRegion === r ? 'active' : ''}`;
+            regTab.innerHTML = `${r} <span class="badge-count">${formatNumber(regVol)}</span>`;
+            regTab.addEventListener('click', () => {
+                activeHeatmapRegion = r;
+                renderHeatmaps();
+            });
+            tabsContainer.appendChild(regTab);
+        });
+    }
+
+    container.innerHTML = '';
+
+    if (regionsList.length === 0) {
+        container.innerHTML = '<div style="grid-column: span 3; text-align: center; padding: 3rem; color: var(--text-muted);">Không tìm thấy dữ liệu vùng phù hợp.</div>';
+        return;
+    }
+
+    // 3. Render content based on active tab
+    if (activeHeatmapRegion === 'all') {
+        // RENDER SUMMARY COMPARISON
+        let summaryHtml = `
+            <div style="grid-column: span 3; display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+                <div class="region-summary-container">
+        `;
+
+        Object.values(regionAggregations).sort((a,b) => b.vol - a.vol).forEach(reg => {
+            const avgOpr = reg.vol > 0 ? (reg.totalOprVol / reg.vol) : 0;
+            const avgRotLc = reg.vol > 0 ? (reg.totalRotLcVol / reg.vol) : 0;
+            const avgOdr = reg.vol > 0 ? (reg.totalOdrVol / reg.vol) : 0;
+
+            summaryHtml += `
+                <div class="region-summary-card" onclick="activeHeatmapRegion='${reg.vung}'; renderHeatmaps();">
+                    <h4>${reg.vung} <span class="region-badge">${reg.districtsCount} Huyện</span></h4>
+                    <div class="region-summary-metrics">
+                        <div class="region-metric-item">
+                            <span>Sản Lượng</span>
+                            <strong>${formatNumber(reg.vol)} đơn</strong>
+                        </div>
+                        <div class="region-metric-item">
+                            <span>Rớt Luân Chuyển</span>
+                            <strong style="color: ${avgRotLc > 0.02 ? '#fc8181' : '#4ade80'}">${formatPercent(avgRotLc)}</strong>
+                        </div>
+                        <div class="region-metric-item">
+                            <span>OPR Trung Bình</span>
+                            <strong style="color: ${avgOpr < 0.90 ? '#fc8181' : '#4ade80'}">${formatPercent(avgOpr)}</strong>
+                        </div>
+                        <div class="region-metric-item">
+                            <span>SLA ODR</span>
+                            <strong style="color: ${avgOdr < 0.92 ? '#fc8181' : '#4ade80'}">${formatPercent(avgOdr)}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        summaryHtml += `
+                </div>
+                
+                <h4 style="margin-top: 0.5rem; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Bảng So Sánh Chi Tiết Giữa Các Vùng</h4>
+                <div class="table-responsive">
+                    <table class="heatmap-table">
+                        <thead>
+                            <tr>
+                                <th>Tên Vùng Vận Hành</th>
+                                <th style="text-align: right;">Số Huyện Phát Sinh</th>
+                                <th style="text-align: right;">Tổng Sản Lượng (Đơn)</th>
+                                <th style="text-align: center;">Tỷ Lệ Rớt LC (%)</th>
+                                <th style="text-align: center;">OPR Trung Bình (%)</th>
+                                <th style="text-align: center;">Tỷ Lệ ODR (%)</th>
+                                <th style="text-align: center;">Tỷ Lệ Longtail (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        Object.values(regionAggregations).sort((a,b) => b.vol - a.vol).forEach(reg => {
+            const avgOpr = reg.vol > 0 ? (reg.totalOprVol / reg.vol) : 0;
+            const avgRotLc = reg.vol > 0 ? (reg.totalRotLcVol / reg.vol) : 0;
+            const avgOdr = reg.vol > 0 ? (reg.totalOdrVol / reg.vol) : 0;
+            const avgLongtail = reg.vol > 0 ? (reg.totalLongtailVol / reg.vol) : 0;
+
+            const redBg = 'rgba(239, 68, 68, 0.15)';
+            const greenBg = 'rgba(34, 197, 94, 0.1)';
+            const redText = '#fc8181';
+            const greenText = '#4ade80';
+
+            summaryHtml += `
+                <tr onclick="activeHeatmapRegion='${reg.vung}'; renderHeatmaps();" style="cursor: pointer;">
+                    <td><strong style="color: var(--accent-blue);">${reg.vung}</strong></td>
+                    <td style="text-align: right; font-weight: bold; color: white;">${formatNumber(reg.districtsCount)}</td>
+                    <td style="text-align: right; font-weight: bold; color: white;">${formatNumber(reg.vol)}</td>
+                    <td style="background-color: ${avgRotLc > 0.02 ? redBg : greenBg}; color: ${avgRotLc > 0.02 ? redText : greenText}; font-weight: bold; text-align: center;">${formatPercent(avgRotLc)}</td>
+                    <td style="background-color: ${avgOpr < 0.90 ? redBg : greenBg}; color: ${avgOpr < 0.90 ? redText : greenText}; font-weight: bold; text-align: center;">${formatPercent(avgOpr)}</td>
+                    <td style="background-color: ${avgOdr < 0.92 ? redBg : greenBg}; color: ${avgOdr < 0.92 ? redText : greenText}; font-weight: bold; text-align: center;">${formatPercent(avgOdr)}</td>
+                    <td style="background-color: ${avgLongtail > 0.08 ? redBg : greenBg}; color: ${avgLongtail > 0.08 ? redText : greenText}; font-weight: bold; text-align: center;">${formatPercent(avgLongtail)}</td>
+                </tr>
+            `;
+        });
+
+        summaryHtml += `
+                        </tbody>
+                    </table>
+                </div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); font-style: italic; display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; background: rgba(59, 130, 246, 0.05); padding: 0.75rem 1rem; border-radius: var(--border-radius-sm); border: 1px solid rgba(59, 130, 246, 0.15);">
+                    <i class='bx bx-info-circle' style="font-size: 1.1rem; color: var(--accent-blue);"></i>
+                    <span>Mẹo: Bạn có thể nhấn trực tiếp vào thẻ vùng hoặc dòng của bảng so sánh trên để chuyển nhanh sang xem bản đồ nhiệt chi tiết của vùng đó.</span>
+                </div>
+            </div>
+        `;
+        container.innerHTML = summaryHtml;
+    } else {
+        // RENDER SINGLE SELECTED REGION
+        const r = activeHeatmapRegion;
         const districtObj = regions[r];
+        if (!districtObj) {
+            container.innerHTML = '<div style="grid-column: span 3; text-align: center; padding: 3rem; color: var(--text-muted);">Không tìm thấy dữ liệu của vùng này.</div>';
+            return;
+        }
+
         const districts = Object.entries(districtObj).map(([name, data]) => ({
             name,
             vol: data.vol,
@@ -1084,26 +1280,33 @@ function renderHeatmaps() {
 
         const maxVol = Math.max(...districts.map(d => d.vol));
 
-        let html = `<div><h4 style="margin-bottom: 0.5rem; color: var(--accent-blue);">${r}</h4>`;
+        let html = `<div style="grid-column: span 3; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">
+                    Đang xem chi tiết Quận/Huyện tại vùng: <strong style="color: white; background-color: var(--bg-panel-hover); padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.85rem; margin-left: 0.25rem; border: 1px solid var(--border-color);">${r}</strong>
+                </span>
+                <button class="btn-toggle" onclick="activeHeatmapRegion='all'; renderHeatmaps();" style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; padding: 0.35rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); color: var(--text-main); background-color: rgba(30, 41, 59, 0.4); cursor: pointer; transition: var(--transition);">
+                    <i class='bx bx-chevron-left'></i> Quay lại Tất Cả
+                </button>
+            </div>`;
+
         html += `<table class="heatmap-table">
             <thead>
                 <tr>
                     <th>Quận/Huyện</th>
-                    <th style="text-align: right;">Sản Lượng</th>
-                    <th style="text-align: center;">Rớt LC</th>
-                    <th style="text-align: center;">OPR</th>
-                    <th style="text-align: center;">ODR</th>
-                    <th style="text-align: center;">Longtail</th>
+                    <th style="text-align: right;">Sản Lượng (Đơn)</th>
+                    <th style="text-align: center;">Tỷ Lệ Rớt LC (%)</th>
+                    <th style="text-align: center;">OPR Trung Bình (%)</th>
+                    <th style="text-align: center;">Tỷ Lệ ODR (%)</th>
+                    <th style="text-align: center;">Tỷ Lệ Longtail (%)</th>
                 </tr>
             </thead>
             <tbody>`;
 
         districts.forEach(d => {
-            // Volume: clean transparent blue overlay for high-contrast legibility
             const volIntensity = maxVol > 0 ? (d.vol / maxVol) : 0;
             const volBg = `rgba(59, 130, 246, ${Math.max(0.12, volIntensity * 0.5)})`;
             
-            // Unified simplified color styling: soft transparent green (healthy) vs soft transparent red (warning)
             const redBg = 'rgba(239, 68, 68, 0.15)';
             const greenBg = 'rgba(34, 197, 94, 0.1)';
             const redText = '#fc8181';
@@ -1122,7 +1325,7 @@ function renderHeatmaps() {
             const longtailColor = d.longtail > 0.08 ? redText : greenText;
 
             html += `<tr>
-                <td>${d.name}</td>
+                <td><strong>${d.name}</strong></td>
                 <td style="background-color: ${volBg}; text-align: right; font-weight: bold; color: white;">${formatNumber(d.vol)}</td>
                 <td style="background-color: ${rotLcBg}; color: ${rotLcColor}; font-weight: bold; text-align: center;">${formatPercent(d.rotLc)}</td>
                 <td style="background-color: ${oprBg}; color: ${oprColor}; font-weight: bold; text-align: center;">${formatPercent(d.opr)}</td>
@@ -1132,8 +1335,8 @@ function renderHeatmaps() {
         });
 
         html += `</tbody></table></div>`;
-        container.innerHTML += html;
-    });
+        container.innerHTML = html;
+    }
 }
 
 
@@ -1257,8 +1460,8 @@ function calculateShopGroups() {
 
         // 1. Size 1 (Single shop proposals)
         candidateShops.forEach(s => {
-            // Check if s qualifies for Flow 2 single
-            const fitsFlow2 = s.pct_top_tinh_giao > 0.30 && s.kl_tb_ngay_top_tinh_giao >= 5000;
+            // Check if s qualifies for Flow 2 single: Route weight >= 5000 kg (Xe 5T hoặc Xe 8T)
+            const fitsFlow2 = s.kl_tb_ngay_top_tinh_giao >= 5000;
             
             if (fitsFlow2) {
                 allProposals.push({
@@ -1302,9 +1505,8 @@ function calculateShopGroups() {
                 const s1 = candidateShops[i];
                 const s2 = candidateShops[j];
 
-                // Check Flow 2 criteria
-                const fitsFlow2 = s1.pct_top_tinh_giao > 0.30 && s2.pct_top_tinh_giao > 0.30 && 
-                                  (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao) >= 5000;
+                // Check Flow 2 criteria: combined route weight >= 5000 kg
+                const fitsFlow2 = (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao) >= 5000;
 
                 const combinedVol = s1.total_vol + s2.total_vol;
                 const combinedOpr = combinedVol > 0 ? ((s1.weighted_opr * s1.total_vol) + (s2.weighted_opr * s2.total_vol)) / combinedVol : 0;
@@ -1356,9 +1558,8 @@ function calculateShopGroups() {
                     const s2 = candidateShops[j];
                     const s3 = candidateShops[k];
 
-                    // Check Flow 2 criteria
-                    const fitsFlow2 = s1.pct_top_tinh_giao > 0.30 && s2.pct_top_tinh_giao > 0.30 && s3.pct_top_tinh_giao > 0.30 &&
-                                      (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao + s3.kl_tb_ngay_top_tinh_giao) >= 5000;
+                    // Check Flow 2 criteria: combined route weight >= 5000 kg
+                    const fitsFlow2 = (s1.kl_tb_ngay_top_tinh_giao + s2.kl_tb_ngay_top_tinh_giao + s3.kl_tb_ngay_top_tinh_giao) >= 5000;
 
                     const combinedVol = s1.total_vol + s2.total_vol + s3.total_vol;
                     const combinedOpr = combinedVol > 0 ? 
@@ -1669,15 +1870,39 @@ function updateVolumeBreakdown() {
     if (!tbody || !barsContainer) return;
     
     tbody.innerHTML = '';
-    barsContainer.innerHTML = '';
     
-    const segments = [
-        '1. Duoi 100 don/ngay',
-        '2. 100 - 300 don/ngay',
-        '3. 300 - 500 don/ngay',
-        '4. 500 - 1000 don/ngay',
-        '5. Trên 1000 don/ngay'
-    ];
+    // Determine active segmentation toggle
+    const activeSegBtn = document.querySelector('#segmentation-toggle .btn-toggle.active');
+    const segMode = activeSegBtn ? activeSegBtn.dataset.type : 'weight'; // default to weight!
+    
+    // Update column header text
+    const colHeader = document.getElementById('segment-col-header');
+    if (colHeader) {
+        colHeader.textContent = segMode === 'weight' ? 'Phân Khúc Khối Lượng (Weight)' : 'Phân Khúc Sản Lượng (Volume)';
+    }
+    
+    let segments = [];
+    let keyField = '';
+    
+    if (segMode === 'weight') {
+        segments = [
+            '1. Dưới 50 kg/ngày',
+            '2. 50 - 200 kg/ngày',
+            '3. 200 - 500 kg/ngày',
+            '4. 500 - 1000 kg/ngày',
+            '5. Trên 1000 kg/ngày'
+        ];
+        keyField = 'nhom_khoi_luong';
+    } else {
+        segments = [
+            '1. Duoi 100 don/ngay',
+            '2. 100 - 300 don/ngay',
+            '3. 300 - 500 don/ngay',
+            '4. 500 - 1000 don/ngay',
+            '5. Trên 1000 don/ngay'
+        ];
+        keyField = 'nhom_san_luong';
+    }
     
     const counts = {};
     segments.forEach(seg => {
@@ -1691,7 +1916,7 @@ function updateVolumeBreakdown() {
     
     let totalFilteredShops = 0;
     filteredData.forEach(row => {
-        const seg = row.nhom_san_luong;
+        const seg = row[keyField];
         if (counts[seg]) {
             counts[seg].shopCount++;
             counts[seg].totalVol += row.vol || 0;
@@ -1710,12 +1935,11 @@ function updateVolumeBreakdown() {
         const pctStr = formatPercent(pct);
         
         let badgeColor = '';
-        let barBgColor = '';
-        if (seg.startsWith('1')) { badgeColor = 'rgba(148, 163, 184, 0.15); color: #94a3b8;'; barBgColor = '#94a3b8'; }
-        else if (seg.startsWith('2')) { badgeColor = 'rgba(59, 130, 246, 0.15); color: #60a5fa;'; barBgColor = '#3b82f6'; }
-        else if (seg.startsWith('3')) { badgeColor = 'rgba(20, 184, 166, 0.15); color: #2dd4bf;'; barBgColor = '#14b8a6'; }
-        else if (seg.startsWith('4')) { badgeColor = 'rgba(168, 85, 247, 0.15); color: #c084fc;'; barBgColor = '#a855f7'; }
-        else { badgeColor = 'rgba(239, 68, 68, 0.15); color: #f87171;'; barBgColor = '#ef4444'; }
+        if (seg.startsWith('1')) badgeColor = 'rgba(148, 163, 184, 0.15); color: #94a3b8;';
+        else if (seg.startsWith('2')) badgeColor = 'rgba(59, 130, 246, 0.15); color: #60a5fa;';
+        else if (seg.startsWith('3')) badgeColor = 'rgba(20, 184, 166, 0.15); color: #2dd4bf;';
+        else if (seg.startsWith('4')) badgeColor = 'rgba(168, 85, 247, 0.15); color: #c084fc;';
+        else badgeColor = 'rgba(239, 68, 68, 0.15); color: #f87171;';
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1726,19 +1950,113 @@ function updateVolumeBreakdown() {
             <td style="text-align: center; font-weight: bold; color: #cbd5e1;">${pctStr}</td>
         `;
         tbody.appendChild(tr);
-        
-        const barDiv = document.createElement('div');
-        barDiv.className = 'volume-bar-item';
-        barDiv.style.cssText = 'display: flex; flex-direction: column; gap: 0.3rem;';
-        barDiv.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                <span style="font-weight: 500; color: #e2e8f0;">${seg}</span>
-                <span style="font-weight: bold; color: ${barBgColor};">${shopCountStr} shop (${pctStr})</span>
-            </div>
-            <div style="width: 100%; height: 8px; background: rgba(51, 65, 85, 0.6); border-radius: 4px; overflow: hidden;">
-                <div style="width: ${pct * 100}%; height: 100%; background: ${barBgColor}; border-radius: 4px; transition: width 0.3s ease;"></div>
-            </div>
-        `;
-        barsContainer.appendChild(barDiv);
+    });
+    
+    // Draw Dynamic Premium Doughnut Chart inside the volume-bars-container
+    if (charts.segmentation) {
+        charts.segmentation.destroy();
+    }
+    
+    // Check if canvas exists, else clear barsContainer and create canvas
+    barsContainer.innerHTML = '';
+    const canvasWrapper = document.createElement('div');
+    canvasWrapper.className = 'canvas-wrapper';
+    canvasWrapper.style.cssText = 'height: 280px; width: 100%; max-width: 320px; position: relative;';
+    
+    const canvas = document.createElement('canvas');
+    canvas.id = 'chart-shop-segmentation';
+    canvasWrapper.appendChild(canvas);
+    barsContainer.appendChild(canvasWrapper);
+    
+    const ctx = canvas.getContext('2d');
+    
+    const chartLabels = segments;
+    const chartData = segments.map(seg => counts[seg].shopCount);
+    
+    const bgColors = [
+        'rgba(148, 163, 184, 0.65)',  // Slate Gray
+        'rgba(59, 130, 246, 0.65)',   // Blue
+        'rgba(20, 184, 166, 0.65)',   // Teal
+        'rgba(168, 85, 247, 0.65)',   // Purple
+        'rgba(239, 68, 68, 0.65)'     // Red
+    ];
+    
+    const borderColors = [
+        '#94a3b8',
+        '#3b82f6',
+        '#14b8a6',
+        '#a855f7',
+        '#ef4444'
+    ];
+    
+    charts.segmentation = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                data: chartData,
+                backgroundColor: bgColors,
+                borderColor: borderColors,
+                borderWidth: 1.5,
+                hoverOffset: 12
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    display: false // Displayed in the table, keep chart ultra clean!
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    titleColor: '#fff',
+                    bodyColor: '#94a3b8',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            const shopCount = context.raw;
+                            const pct = totalFilteredShops > 0 ? (shopCount / totalFilteredShops * 100) : 0;
+                            return ` Số shop: ${shopCount} (${pct.toFixed(1)}%)`;
+                        }
+                    }
+                },
+                datalabels: {
+                    display: false // Disable direct data label rendering inside slices
+                }
+            }
+        },
+        plugins: [{
+            id: 'centerText',
+            beforeDraw: function(chart) {
+                const width = chart.width;
+                const height = chart.height;
+                const ctx = chart.ctx;
+                
+                ctx.restore();
+                
+                // Total label
+                ctx.font = '500 0.8rem Inter';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#94a3b8';
+                const text1 = "TỔNG SỐ SHOP";
+                const text1X = Math.round((width - ctx.measureText(text1).width) / 2);
+                const text1Y = height / 2 - 12;
+                ctx.fillText(text1, text1X, text1Y);
+                
+                // Number value
+                ctx.font = 'bold 1.6rem Inter';
+                ctx.fillStyle = '#ffffff';
+                const text2 = formatNumber(totalFilteredShops);
+                const text2X = Math.round((width - ctx.measureText(text2).width) / 2);
+                const text2Y = height / 2 + 12;
+                ctx.fillText(text2, text2X, text2Y);
+                
+                ctx.save();
+            }
+        }]
     });
 }

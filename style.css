@@ -1005,4 +1005,118 @@ tbody tr.danger-row:hover {
     }
 }
 
+/* Heatmap Dynamic Region Tabs */
+.heatmap-tab-btn {
+    background-color: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.45rem 1rem;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
 
+.heatmap-tab-btn:hover {
+    color: var(--text-main);
+    background-color: var(--bg-panel-hover);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.heatmap-tab-btn.active {
+    color: white;
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #1e40af 100%);
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+.heatmap-tab-btn .badge-count {
+    background-color: rgba(15, 23, 42, 0.5);
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-left: 0.25rem;
+}
+
+.heatmap-tab-btn.active .badge-count {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Premium summary cards inside All Regions view */
+.region-summary-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.region-summary-card {
+    background: linear-gradient(135deg, var(--bg-panel) 0%, rgba(30, 41, 59, 0.8) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-soft);
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.region-summary-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-blue);
+    box-shadow: var(--shadow-glow);
+}
+
+.region-summary-card h4 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.region-summary-card h4 .region-badge {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+}
+
+.region-summary-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 1rem;
+    font-size: 0.78rem;
+}
+
+.region-metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.region-metric-item span {
+    color: var(--text-muted);
+}
+
+.region-metric-item strong {
+    font-size: 0.9rem;
+    color: white;
+}
+
+/* Toggle buttons styling alignment */
+.segment-section-header .chart-toggle-group {
+    margin-left: auto;
+}

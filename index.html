@@ -215,13 +215,19 @@
 
             <!-- Volume Segments Section -->
             <section class="volume-segments-section">
-                <h3><i class='bx bx-pie-chart-alt' style="color: var(--accent-blue); font-size: 1.3rem; vertical-align: middle; margin-right: 0.5rem;"></i> Phân Khúc Shop Theo Sản Lượng (Volume)</h3>
+                <div class="segment-section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;"><i class='bx bx-pie-chart-alt' style="color: var(--accent-blue); font-size: 1.3rem; vertical-align: middle; margin-right: 0.5rem;"></i> Phân Khúc Shop Vận Hành</h3>
+                    <div class="chart-toggle-group" id="segmentation-toggle">
+                        <button class="btn-toggle active" data-type="weight"><i class='bx bx-dumbbell'></i> Theo Khối Lượng</button>
+                        <button class="btn-toggle" data-type="volume"><i class='bx bx-package'></i> Theo Sản Lượng</button>
+                    </div>
+                </div>
                 <div class="volume-grid">
                     <div class="table-responsive">
                         <table id="volume-breakdown-table" class="heatmap-table">
                             <thead>
                                 <tr>
-                                    <th>Phân Khúc Sản Lượng (Volume)</th>
+                                    <th id="segment-col-header">Phân Khúc Khối Lượng (Weight)</th>
                                     <th style="text-align: right;">Số Lượng Shop</th>
                                     <th style="text-align: right;">Tổng Sản Lượng (Đơn)</th>
                                     <th style="text-align: right;">Tổng Khối Lượng (Kg)</th>
@@ -233,15 +239,22 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="volume-bars-container" id="volume-bars-container">
-                        <!-- Dynamic bars showing visual percentage breakdown -->
+                    <div class="volume-bars-container" id="volume-bars-container" style="display: flex; flex-direction: column; gap: 1rem; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.4); border-radius: var(--border-radius); border: 1px solid var(--border-color); padding: 1.5rem; min-height: 320px;">
+                        <div class="canvas-wrapper" style="height: 280px; width: 100%; max-width: 320px; position: relative;">
+                            <canvas id="chart-shop-segmentation"></canvas>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- Heatmap Section -->
             <section class="heatmap-section">
-                <h3>Bảng Đồ Nhiệt (Heatmap) Theo Vùng</h3>
+                <div class="heatmap-section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;"><i class='bx bx-map-alt' style="color: var(--accent-blue); font-size: 1.35rem; vertical-align: middle; margin-right: 0.5rem;"></i>Bản Đồ Nhiệt (Heatmap) Theo Vùng</h3>
+                    <div class="heatmap-tabs" id="heatmap-tabs" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <!-- Region tabs will be injected dynamically -->
+                    </div>
+                </div>
                 <div id="heatmap-container" class="heatmap-grid">
                     <!-- HTML Heatmaps injected here -->
                 </div>
