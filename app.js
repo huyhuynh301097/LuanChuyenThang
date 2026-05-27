@@ -1030,7 +1030,7 @@ function updateTable() {
             <td><strong>${row.warehouse_name || '-'}</strong></td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.client_id || '-'}</td>
             <td style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">${row.shop_id || '-'}</td>
-            <td style="color: var(--accent-blue); font-weight: bold;">${row.ten_kh || '-'}</td>
+            <td style="color: var(--accent-blue); font-weight: bold;"><div class="shop-name-cell" title="${row.ten_kh || ''}">${row.ten_kh || '-'}</div></td>
             <td><span class="badge" style="background-color: rgba(59, 130, 246, 0.15); color: #60a5fa;">${row.loai_kh || '-'}</span></td>
             <td style="background-color: ${volBg}; font-weight: bold;">${formatNumber(row.vol)}</td>
             <td>${formatFloat(row.kl, 2)}</td>

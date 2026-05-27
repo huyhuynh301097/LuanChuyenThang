@@ -814,12 +814,23 @@ tbody tr.danger-row:hover {
 }
 
 /* Compact Shop Name Column in Raw Data Table */
-#details-table th:nth-child(9),
+#details-table th:nth-child(9) {
+    max-width: 150px;
+    white-space: normal !important; /* Allow header text to wrap so it stays narrow! */
+    word-break: break-word;
+}
+
 #details-table td:nth-child(9) {
-    max-width: 220px;
+    max-width: 150px;
+    width: 150px;
+}
+
+.shop-name-cell {
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: block;
 }
 
 /* Custom Weight Slider Styling */
